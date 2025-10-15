@@ -112,132 +112,135 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { loadGameState, saveGameState } from '@/utils/storage'
 import { generateSolutions } from '@/data/solutions'
 import { applySolutionModifiers } from '@/utils/gameLogic'
 
-export default {
-  data() {
-    return {
-      gameState: null,
-      currentQuarter: null,
-      quarterIndex: 0,
-      solutions: [],
-      selectedIndex: null,
-      playerStats: {
-        stamina: 50,
-        maxStamina: 50
-      }
-    }
-  },
-  computed: {
-    staminaPercent() {
-      return (this.playerStats.stamina / this.playerStats.maxStamina * 100)
-    },
-    remainingStamina() {
-      if (this.selectedIndex === null) return this.playerStats.stamina
-      return this.playerStats.stamina - this.solutions[this.selectedIndex].stamina
-    }
-  },
-  onLoad() {
-    this.initTask()
-  },
-  methods: {
-    initTask() {
-      // 加载游戏状态
-      this.gameState = loadGameState()
-      
-      if (!this.gameState) {
-        uni.showToast({
-          title: '游戏状态错误',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
-        return
-      }
-      
-      // 验证游戏状态的完整性
-      if (!this.gameState.product || !this.gameState.product.quarters) {
-        uni.showToast({
-          title: '产品数据错误',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
-        return
-      }
-      
-      this.playerStats = this.gameState.playerStats || {
-        stamina: 50,
-        maxStamina: 50
-      }
-      this.quarterIndex = this.gameState.quarterIndex || 0
-      this.currentQuarter = this.gameState.product.quarters[this.quarterIndex]
-      
-      if (!this.currentQuarter) {
-        uni.showToast({
-          title: '季度数据错误',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
-        return
-      }
-      
-      // 生成方案
-      let baseSolutions = generateSolutions(this.gameState.product, this.quarterIndex)
-      
-      // 应用临时升级对方案的影响
-      if (this.playerStats.tempUpgrades && this.playerStats.tempUpgrades.length > 0) {
-        this.solutions = baseSolutions.map(s => 
-          applySolutionModifiers(s, this.playerStats.tempUpgrades)
-        )
-      } else {
-        this.solutions = baseSolutions
-      }
-    },
-    selectSolution(index) {
-      this.selectedIndex = index
-      
-      // 震动反馈
-      uni.vibrateShort({
-        type: 'light'
-      })
-    },
-    confirmSelection() {
-      if (this.selectedIndex === null) {
-        uni.showToast({
-          title: '请选择一个方案',
-          icon: 'none'
-        })
-        return
-      }
-      
-      const selectedSolution = this.solutions[this.selectedIndex]
-      
-      // 保存选择的方案
-      if (!this.gameState.selectedSolutions) {
-        this.gameState.selectedSolutions = []
-      }
-      this.gameState.selectedSolutions.push(selectedSolution)
-      
-      saveGameState(this.gameState)
-      
-      // 跳转到任务进行页面
-      uni.navigateTo({
-        url: '/pages/task-progress/task-progress'
-      })
-    },
-    goBack() {
+// 状态数据
+const gameState = ref(null)
+const currentQuarter = ref(null)
+const quarterIndex = ref(0)
+const solutions = ref([])
+const selectedIndex = ref(null)
+const playerStats = ref({
+  stamina: 50,
+  maxStamina: 50
+})
+
+// 计算属性
+const staminaPercent = computed(() => {
+  return (playerStats.value.stamina / playerStats.value.maxStamina * 100)
+})
+
+const remainingStamina = computed(() => {
+  if (selectedIndex.value === null) return playerStats.value.stamina
+  return playerStats.value.stamina - solutions.value[selectedIndex.value].stamina
+})
+
+// 方法
+const initTask = () => {
+  // 加载游戏状态
+  gameState.value = loadGameState()
+  
+  if (!gameState.value) {
+    uni.showToast({
+      title: '游戏状态错误',
+      icon: 'none'
+    })
+    setTimeout(() => {
       uni.navigateBack()
-    }
+    }, 1500)
+    return
+  }
+  
+  // 验证游戏状态的完整性
+  if (!gameState.value.product || !gameState.value.product.quarters) {
+    uni.showToast({
+      title: '产品数据错误',
+      icon: 'none'
+    })
+    setTimeout(() => {
+      uni.navigateBack()
+    }, 1500)
+    return
+  }
+  
+  playerStats.value = gameState.value.playerStats || {
+    stamina: 50,
+    maxStamina: 50
+  }
+  quarterIndex.value = gameState.value.quarterIndex || 0
+  currentQuarter.value = gameState.value.product.quarters[quarterIndex.value]
+  
+  if (!currentQuarter.value) {
+    uni.showToast({
+      title: '季度数据错误',
+      icon: 'none'
+    })
+    setTimeout(() => {
+      uni.navigateBack()
+    }, 1500)
+    return
+  }
+  
+  // 生成方案
+  let baseSolutions = generateSolutions(gameState.value.product, quarterIndex.value)
+  
+  // 应用临时升级对方案的影响
+  if (playerStats.value.tempUpgrades && playerStats.value.tempUpgrades.length > 0) {
+    solutions.value = baseSolutions.map(s => 
+      applySolutionModifiers(s, playerStats.value.tempUpgrades)
+    )
+  } else {
+    solutions.value = baseSolutions
   }
 }
+
+const selectSolution = (index) => {
+  selectedIndex.value = index
+  
+  // 震动反馈
+  uni.vibrateShort({
+    type: 'light'
+  })
+}
+
+const confirmSelection = () => {
+  if (selectedIndex.value === null) {
+    uni.showToast({
+      title: '请选择一个方案',
+      icon: 'none'
+    })
+    return
+  }
+  
+  const selectedSolution = solutions.value[selectedIndex.value]
+  
+  // 保存选择的方案
+  if (!gameState.value.selectedSolutions) {
+    gameState.value.selectedSolutions = []
+  }
+  gameState.value.selectedSolutions.push(selectedSolution)
+  
+  saveGameState(gameState.value)
+  
+  // 跳转到任务进行页面
+  uni.navigateTo({
+    url: '/pages/task-progress/task-progress'
+  })
+}
+
+const goBack = () => {
+  uni.navigateBack()
+}
+
+// 生命周期
+onLoad(() => {
+  initTask()
+})
 </script>
 
 <style scoped>

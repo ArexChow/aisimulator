@@ -147,122 +147,127 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { loadPlayerData, saveGameState, clearGameState } from '@/utils/storage'
 import { selectRandomProduct } from '@/data/products'
 
-export default {
-  data() {
-    return {
-      currentProduct: null,
-      playerStats: {
-        vision: 50,
-        luck: 50,
-        stamina: 50,
-        maxStamina: 50,
-        tempUpgrades: []
-      },
-      quarterIndex: 0,
-      selectedSolutions: [],
-      currentYear: 2000,
-      showQuitModal: false
-    }
-  },
-  computed: {
-    staminaPercent() {
-      return (this.playerStats.stamina / this.playerStats.maxStamina * 100)
-    }
-  },
-  onLoad() {
-    this.initGame()
-  },
-  methods: {
-    initGame() {
-      // 加载玩家数据
-      const playerData = loadPlayerData()
-      
-      // 根据眼界选择产品
-      this.currentProduct = selectRandomProduct(playerData.vision)
-      
-      if (!this.currentProduct) {
-        uni.showModal({
-          title: '提示',
-          content: '没有找到合适的产品，请提升眼界后再试',
-          showCancel: false,
-          success: () => {
-            uni.navigateBack()
-          }
-        })
-        return
+// 状态数据
+const currentProduct = ref(null)
+const playerStats = ref({
+  vision: 50,
+  luck: 50,
+  stamina: 50,
+  maxStamina: 50,
+  tempUpgrades: []
+})
+const quarterIndex = ref(0)
+const selectedSolutions = ref([])
+const currentYear = ref(2000)
+const showQuitModal = ref(false)
+
+// 计算属性
+const staminaPercent = computed(() => {
+  return (playerStats.value.stamina / playerStats.value.maxStamina * 100)
+})
+
+// 方法
+const initGame = () => {
+  // 加载玩家数据
+  const playerData = loadPlayerData()
+  
+  // 根据眼界选择产品
+  currentProduct.value = selectRandomProduct(playerData.vision)
+  
+  if (!currentProduct.value) {
+    uni.showModal({
+      title: '提示',
+      content: '没有找到合适的产品，请提升眼界后再试',
+      showCancel: false,
+      success: () => {
+        uni.navigateBack()
       }
-      
-      // 设置年份
-      this.currentYear = this.currentProduct.year
-      
-      // 初始化玩家状态
-      this.playerStats = {
-        vision: playerData.vision,
-        luck: playerData.luck,
-        stamina: playerData.stamina,
-        maxStamina: playerData.maxStamina,
-        tempUpgrades: playerData.tempUpgrades || []
-      }
-      
-      // 保存游戏状态
-      this.saveState()
-    },
-    saveState() {
-      saveGameState({
-        product: this.currentProduct,
-        playerStats: this.playerStats,
-        quarterIndex: this.quarterIndex,
-        selectedSolutions: this.selectedSolutions,
-        currentYear: this.currentYear
-      })
-    },
-    startQuarter() {
-      this.saveState()
-      
-      uni.navigateTo({
-        url: '/pages/quarter-task/quarter-task'
-      })
-    },
-    startBoss() {
-      this.saveState()
-      
-      uni.navigateTo({
-        url: '/pages/boss-battle/boss-battle'
-      })
-    },
-    confirmQuit() {
-      this.showQuitModal = true
-    },
-    quitGame() {
-      clearGameState()
-      uni.reLaunch({
-        url: '/pages/home/home'
-      })
-    },
-    getCategoryName(category) {
-      const names = {
-        social: '社交',
-        ecommerce: '电商',
-        video: '视频',
-        tool: '工具',
-        media: '媒体',
-        content: '内容',
-        education: '教育',
-        fintech: '金融科技',
-        search: '搜索',
-        transport: '出行',
-        game: '游戏',
-        enterprise: '企业服务',
-        security: '安全'
-      }
-      return names[category] || category
-    }
+    })
+    return
   }
+  
+  // 设置年份
+  currentYear.value = currentProduct.value.year
+  
+  // 初始化玩家状态
+  playerStats.value = {
+    vision: playerData.vision,
+    luck: playerData.luck,
+    stamina: playerData.stamina,
+    maxStamina: playerData.maxStamina,
+    tempUpgrades: playerData.tempUpgrades || []
+  }
+  
+  // 保存游戏状态
+  saveState()
 }
+
+const saveState = () => {
+  saveGameState({
+    product: currentProduct.value,
+    playerStats: playerStats.value,
+    quarterIndex: quarterIndex.value,
+    selectedSolutions: selectedSolutions.value,
+    currentYear: currentYear.value
+  })
+}
+
+const startQuarter = () => {
+  saveState()
+  
+  uni.navigateTo({
+    url: '/pages/quarter-task/quarter-task'
+  })
+}
+
+const startBoss = () => {
+  saveState()
+  
+  uni.navigateTo({
+    url: '/pages/boss-battle/boss-battle'
+  })
+}
+
+const confirmQuit = () => {
+  showQuitModal.value = true
+}
+
+const quitGame = () => {
+  clearGameState()
+  uni.reLaunch({
+    url: '/pages/home/home'
+  })
+}
+
+const getCategoryName = (category) => {
+  const names = {
+    social: '社交',
+    ecommerce: '电商',
+    video: '视频',
+    tool: '工具',
+    media: '媒体',
+    content: '内容',
+    education: '教育',
+    fintech: '金融科技',
+    search: '搜索',
+    transport: '出行',
+    game: '游戏',
+    enterprise: '企业服务',
+    security: '安全'
+  }
+  return names[category] || category
+}
+
+// 生命周期
+onLoad(() => {
+  initGame()
+})
 </script>
 
 <style scoped>

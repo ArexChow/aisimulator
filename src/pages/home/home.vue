@@ -144,57 +144,60 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { loadPlayerData, resetPlayerData } from '@/utils/storage'
 
-export default {
-  data() {
-    return {
-      playerData: {
-        vision: 50,
-        luck: 50,
-        stamina: 50,
-        maxStamina: 50,
-        crystals: 0,
-        gamesPlayed: 0,
-        gamesWon: 0,
-        bestGrade: null,
-        totalCrystals: 0
-      },
-      showRulesModal: false
-    }
-  },
-  onLoad() {
-    this.loadData()
-  },
-  onShow() {
-    // 每次显示页面时重新加载数据
-    this.loadData()
-  },
-  methods: {
-    loadData() {
-      this.playerData = loadPlayerData()
-    },
-    startGame() {
-      // 重置游戏状态（保留晶核和升级）
-      const newData = resetPlayerData()
-      this.playerData = newData
-      
-      // 跳转到游戏主界面
-      uni.navigateTo({
-        url: '/pages/game/game'
-      })
-    },
-    goToUpgrade() {
-      uni.navigateTo({
-        url: '/pages/upgrade/upgrade'
-      })
-    },
-    showRules() {
-      this.showRulesModal = true
-    }
-  }
+// 状态数据
+const playerData = ref({
+  vision: 50,
+  luck: 50,
+  stamina: 50,
+  maxStamina: 50,
+  crystals: 0,
+  gamesPlayed: 0,
+  gamesWon: 0,
+  bestGrade: null,
+  totalCrystals: 0
+})
+const showRulesModal = ref(false)
+
+// 方法
+const loadData = () => {
+  playerData.value = loadPlayerData()
 }
+
+const startGame = () => {
+  // 重置游戏状态（保留晶核和升级）
+  const newData = resetPlayerData()
+  playerData.value = newData
+  
+  // 跳转到游戏主界面
+  uni.navigateTo({
+    url: '/pages/game/game'
+  })
+}
+
+const goToUpgrade = () => {
+  uni.navigateTo({
+    url: '/pages/upgrade/upgrade'
+  })
+}
+
+const showRules = () => {
+  showRulesModal.value = true
+}
+
+// 生命周期
+onLoad(() => {
+  loadData()
+})
+
+onShow(() => {
+  // 每次显示页面时重新加载数据
+  loadData()
+})
 </script>
 
 <style scoped>

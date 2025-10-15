@@ -7,16 +7,15 @@
   </view>
 </template>
 
-<script>
-export default {
-  data() {
-    return {
-      title: 'Hello',
-    }
-  },
-  onLoad() {},
-  methods: {},
-}
+<script setup>
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+
+// 状态数据
+const title = ref('Hello')
+
+// 生命周期
+onLoad(() => {})
 </script>
 
 <style>

@@ -165,231 +165,238 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { ref, computed } from 'vue'
+import { onLoad, onUnload } from '@dcloudio/uni-app'
 import { loadGameState, saveGameState } from '@/utils/storage'
 import { generateBossSolution } from '@/data/solutions'
 import { calculateBossCompletion, isBossSuccess, generateTodoTimings } from '@/utils/gameLogic'
 
-export default {
-  data() {
-    return {
-      gameState: null,
-      product: null,
-      playerStats: null,
-      selectedSolutions: [],
-      bossSolution: null,
-      battleStarted: false,
-      battleFinished: false,
-      battleSuccess: false,
-      completedCount: 0,
-      currentProgress: 0,
-      currentStamina: 0,
-      maxStamina: 0,
-      finalCompletion: 0,
-      statusMessage: '',
-      timers: []
-    }
-  },
-  computed: {
-    staminaPercent() {
-      return (this.currentStamina / this.maxStamina * 100)
-    },
-    estimatedCompletion() {
-      // 估算完成度（不考虑运气因素）
-      return this.bossSolution.baseCompletionRate + this.bossSolution.qualityBonus
-    }
-  },
-  onLoad() {
-    this.initBattle()
-  },
-  onUnload() {
-    this.timers.forEach(timer => clearTimeout(timer))
-  },
-  methods: {
-    initBattle() {
-      this.gameState = loadGameState()
-      
-      if (!this.gameState) {
-        uni.showToast({
-          title: '游戏状态错误',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
-        return
-      }
-      
-      // 验证产品数据
-      if (!this.gameState.product) {
-        uni.showToast({
-          title: '产品数据错误',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
-        return
-      }
-      
-      // 验证玩家状态
-      if (!this.gameState.playerStats) {
-        uni.showToast({
-          title: '玩家状态错误',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
-        return
-      }
-      
-      this.product = this.gameState.product
-      this.playerStats = this.gameState.playerStats
-      this.selectedSolutions = this.gameState.selectedSolutions || []
-      
-      // 生成Boss战方案
-      this.bossSolution = generateBossSolution(this.product, this.selectedSolutions)
-      
-      // 验证Boss方案
-      if (!this.bossSolution || !this.bossSolution.todos) {
-        uni.showToast({
-          title: 'Boss方案生成失败',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1500)
-        return
-      }
-      
-      this.currentStamina = this.playerStats.stamina || 50
-      this.maxStamina = this.playerStats.maxStamina || 50
-    },
-    startBattle() {
-      this.battleStarted = true
-      this.statusMessage = '开始整合各模块...'
-      
-      // 开始执行Boss战
-      const totalTime = 12000 // 12秒
-      const timings = generateTodoTimings(this.bossSolution.todos, totalTime)
-      
-      const staminaPerTodo = this.bossSolution.stamina / this.bossSolution.todos.length
-      
-      let currentTime = 0
-      
-      this.bossSolution.todos.forEach((todo, index) => {
-        currentTime += timings[index]
-        
-        const timer = setTimeout(() => {
-          this.completeTodo(index, staminaPerTodo)
-        }, currentTime)
-        
-        this.timers.push(timer)
-      })
-      
-      // 战斗结束
-      const finishTimer = setTimeout(() => {
-        this.finishBattle()
-      }, currentTime + 1000)
-      
-      this.timers.push(finishTimer)
-    },
-    completeTodo(index, staminaCost) {
-      this.completedCount = index + 1
-      this.currentStamina = Math.max(0, this.currentStamina - staminaCost)
-      this.currentProgress = (this.completedCount / this.bossSolution.todos.length) * 100
-      
-      const messages = [
-        '整合模块中...',
-        '解决兼容性问题...',
-        '全链路测试...',
-        '性能优化...',
-        '安全检查...',
-        '准备上线...',
-        '部署到生产环境...',
-        '监控系统就位...',
-        '正式发布...'
-      ]
-      this.statusMessage = messages[index % messages.length]
-      
-      uni.vibrateShort({
-        type: 'light'
-      })
-      
-      // 检查是否体力耗尽
-      if (this.currentStamina <= 0 && this.completedCount < this.bossSolution.todos.length) {
-        this.failBattle()
-      }
-    },
-    finishBattle() {
-      // 计算最终完成度
-      this.finalCompletion = calculateBossCompletion(
-        this.currentStamina,
-        this.maxStamina,
-        this.bossSolution,
-        this.playerStats.luck
-      )
-      
-      // 判断是否成功
-      this.battleSuccess = isBossSuccess(
-        this.finalCompletion,
-        this.playerStats.tempUpgrades
-      )
-      
-      this.battleFinished = true
-      this.currentProgress = 100
-      this.statusMessage = this.battleSuccess ? '发布成功！' : '未达标准...'
-      
-      // 更新游戏状态
-      this.gameState.playerStats.stamina = Math.round(this.currentStamina)
-      this.gameState.battleResult = {
-        success: this.battleSuccess,
-        completion: this.finalCompletion
-      }
-      
-      saveGameState(this.gameState)
-      
-      // 震动反馈
-      if (this.battleSuccess) {
-        uni.vibrateShort()
-        setTimeout(() => uni.vibrateShort(), 200)
-      } else {
-        uni.vibrateLong()
-      }
-    },
-    failBattle() {
-      this.timers.forEach(timer => clearTimeout(timer))
-      this.timers = []
-      
-      this.finalCompletion = calculateBossCompletion(
-        0,
-        this.maxStamina,
-        this.bossSolution,
-        this.playerStats.luck
-      )
-      
-      this.battleSuccess = false
-      this.battleFinished = true
-      this.currentStamina = 0
-      this.statusMessage = '体力耗尽...'
-      
-      this.gameState.battleResult = {
-        success: false,
-        completion: this.finalCompletion
-      }
-      
-      saveGameState(this.gameState)
-      
-      uni.vibrateLong()
-    },
-    goToResult() {
-      uni.redirectTo({
-        url: `/pages/result/result?success=${this.battleSuccess}`
-      })
-    }
+// 状态数据
+const gameState = ref(null)
+const product = ref(null)
+const playerStats = ref(null)
+const selectedSolutions = ref([])
+const bossSolution = ref(null)
+const battleStarted = ref(false)
+const battleFinished = ref(false)
+const battleSuccess = ref(false)
+const completedCount = ref(0)
+const currentProgress = ref(0)
+const currentStamina = ref(0)
+const maxStamina = ref(0)
+const finalCompletion = ref(0)
+const statusMessage = ref('')
+const timers = ref([])
+
+// 计算属性
+const staminaPercent = computed(() => {
+  return (currentStamina.value / maxStamina.value * 100)
+})
+
+const estimatedCompletion = computed(() => {
+  // 估算完成度（不考虑运气因素）
+  if (!bossSolution.value) return 0
+  return bossSolution.value.baseCompletionRate + bossSolution.value.qualityBonus
+})
+
+// 方法
+const initBattle = () => {
+  gameState.value = loadGameState()
+  
+  if (!gameState.value) {
+    uni.showToast({
+      title: '游戏状态错误',
+      icon: 'none'
+    })
+    setTimeout(() => {
+      uni.navigateBack()
+    }, 1500)
+    return
+  }
+  
+  // 验证产品数据
+  if (!gameState.value.product) {
+    uni.showToast({
+      title: '产品数据错误',
+      icon: 'none'
+    })
+    setTimeout(() => {
+      uni.navigateBack()
+    }, 1500)
+    return
+  }
+  
+  // 验证玩家状态
+  if (!gameState.value.playerStats) {
+    uni.showToast({
+      title: '玩家状态错误',
+      icon: 'none'
+    })
+    setTimeout(() => {
+      uni.navigateBack()
+    }, 1500)
+    return
+  }
+  
+  product.value = gameState.value.product
+  playerStats.value = gameState.value.playerStats
+  selectedSolutions.value = gameState.value.selectedSolutions || []
+  
+  // 生成Boss战方案
+  bossSolution.value = generateBossSolution(product.value, selectedSolutions.value)
+  
+  // 验证Boss方案
+  if (!bossSolution.value || !bossSolution.value.todos) {
+    uni.showToast({
+      title: 'Boss方案生成失败',
+      icon: 'none'
+    })
+    setTimeout(() => {
+      uni.navigateBack()
+    }, 1500)
+    return
+  }
+  
+  currentStamina.value = playerStats.value.stamina || 50
+  maxStamina.value = playerStats.value.maxStamina || 50
+}
+
+const startBattle = () => {
+  battleStarted.value = true
+  statusMessage.value = '开始整合各模块...'
+  
+  // 开始执行Boss战
+  const totalTime = 12000 // 12秒
+  const timings = generateTodoTimings(bossSolution.value.todos, totalTime)
+  
+  const staminaPerTodo = bossSolution.value.stamina / bossSolution.value.todos.length
+  
+  let currentTime = 0
+  
+  bossSolution.value.todos.forEach((todo, index) => {
+    currentTime += timings[index]
+    
+    const timer = setTimeout(() => {
+      completeTodo(index, staminaPerTodo)
+    }, currentTime)
+    
+    timers.value.push(timer)
+  })
+  
+  // 战斗结束
+  const finishTimer = setTimeout(() => {
+    finishBattle()
+  }, currentTime + 1000)
+  
+  timers.value.push(finishTimer)
+}
+
+const completeTodo = (index, staminaCost) => {
+  completedCount.value = index + 1
+  currentStamina.value = Math.max(0, currentStamina.value - staminaCost)
+  currentProgress.value = (completedCount.value / bossSolution.value.todos.length) * 100
+  
+  const messages = [
+    '整合模块中...',
+    '解决兼容性问题...',
+    '全链路测试...',
+    '性能优化...',
+    '安全检查...',
+    '准备上线...',
+    '部署到生产环境...',
+    '监控系统就位...',
+    '正式发布...'
+  ]
+  statusMessage.value = messages[index % messages.length]
+  
+  uni.vibrateShort({
+    type: 'light'
+  })
+  
+  // 检查是否体力耗尽
+  if (currentStamina.value <= 0 && completedCount.value < bossSolution.value.todos.length) {
+    failBattle()
   }
 }
+
+const finishBattle = () => {
+  // 计算最终完成度
+  finalCompletion.value = calculateBossCompletion(
+    currentStamina.value,
+    maxStamina.value,
+    bossSolution.value,
+    playerStats.value.luck
+  )
+  
+  // 判断是否成功
+  battleSuccess.value = isBossSuccess(
+    finalCompletion.value,
+    playerStats.value.tempUpgrades
+  )
+  
+  battleFinished.value = true
+  currentProgress.value = 100
+  statusMessage.value = battleSuccess.value ? '发布成功！' : '未达标准...'
+  
+  // 更新游戏状态
+  gameState.value.playerStats.stamina = Math.round(currentStamina.value)
+  gameState.value.battleResult = {
+    success: battleSuccess.value,
+    completion: finalCompletion.value
+  }
+  
+  saveGameState(gameState.value)
+  
+  // 震动反馈
+  if (battleSuccess.value) {
+    uni.vibrateShort()
+    setTimeout(() => uni.vibrateShort(), 200)
+  } else {
+    uni.vibrateLong()
+  }
+}
+
+const failBattle = () => {
+  timers.value.forEach(timer => clearTimeout(timer))
+  timers.value = []
+  
+  finalCompletion.value = calculateBossCompletion(
+    0,
+    maxStamina.value,
+    bossSolution.value,
+    playerStats.value.luck
+  )
+  
+  battleSuccess.value = false
+  battleFinished.value = true
+  currentStamina.value = 0
+  statusMessage.value = '体力耗尽...'
+  
+  gameState.value.battleResult = {
+    success: false,
+    completion: finalCompletion.value
+  }
+  
+  saveGameState(gameState.value)
+  
+  uni.vibrateLong()
+}
+
+const goToResult = () => {
+  uni.redirectTo({
+    url: `/pages/result/result?success=${battleSuccess.value}`
+  })
+}
+
+// 生命周期
+onLoad(() => {
+  initBattle()
+})
+
+onUnload(() => {
+  timers.value.forEach(timer => clearTimeout(timer))
+})
 </script>
 
 <style scoped>

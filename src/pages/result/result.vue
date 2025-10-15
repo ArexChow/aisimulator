@@ -143,7 +143,9 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { 
   loadGameState, 
   loadPlayerData, 
@@ -162,213 +164,218 @@ import {
 } from '@/utils/gameLogic'
 import { getRandomTempUpgrades, applyTempUpgrade } from '@/data/upgrades'
 
-export default {
-  data() {
-    return {
-      gameState: null,
-      product: null,
-      isSuccess: false,
-      completion: 0,
-      finalGrade: 'C',
-      gradeChange: 0,
-      crystalReward: 0,
-      resultData: {
-        title: '',
-        description: '',
-        emoji: ''
-      },
-      tempUpgrades: [],
-      selectedUpgradeIndex: null,
-      isGameOver: false
-    }
-  },
-  onLoad(options) {
-    this.isSuccess = options.success === 'true'
-    this.initResult()
-  },
-  methods: {
-    initResult() {
-      this.gameState = loadGameState()
-      
-      if (!this.gameState) {
-        uni.showToast({
-          title: '数据错误',
-          icon: 'none'
-        })
-        setTimeout(() => {
-          uni.reLaunch({
-            url: '/pages/home/home'
-          })
-        }, 1500)
-        return
-      }
-      
-      this.product = this.gameState.product
-      
-      if (this.isSuccess) {
-        this.processSuccess()
-      } else {
-        this.processFailure()
-      }
-      
-      // 更新玩家数据
-      this.updatePlayerData()
-      
-      // 保存游戏历史
-      this.saveHistory()
-    },
-    processSuccess() {
-      const battleResult = this.gameState.battleResult
-      this.completion = battleResult.completion
-      
-      // 计算产品评级
-      const gradeResult = calculateProductGrade(
-        this.product,
-        this.completion,
-        this.gameState.playerStats.luck,
-        this.gameState.playerStats.tempUpgrades
-      )
-      
-      this.finalGrade = gradeResult.grade
-      this.gradeChange = gradeResult.gradeChange
-      
-      // 生成市场反响
-      this.resultData = generateMarketResponse(
-        this.product,
-        this.finalGrade,
-        this.completion
-      )
-      
-      // 计算奖励
-      this.crystalReward = calculateReward(
-        this.product,
-        this.finalGrade,
-        this.completion
-      )
-      
-      // 判断是否通关
-      this.isGameOver = (this.finalGrade === 'A' || this.finalGrade === 'S')
-      
-      // 如果未通关，生成临时升级选项
-      if (!this.isGameOver) {
-        this.tempUpgrades = getRandomTempUpgrades(3)
-      }
-    },
-    processFailure() {
-      const battleResult = this.gameState.battleResult
-      this.completion = battleResult ? battleResult.completion : 0
-      
-      this.finalGrade = this.product.grade
-      
-      // 生成失败描述
-      this.resultData = generateFailureResponse(
-        this.product,
-        this.completion
-      )
-      
-      // 计算失败奖励
-      this.crystalReward = calculateFailureReward(
-        this.product,
-        this.completion
-      )
-      
-      this.isGameOver = true
-    },
-    updatePlayerData() {
-      const playerData = loadPlayerData()
-      
-      // 更新游戏次数
-      playerData.gamesPlayed += 1
-      
-      // 更新成功次数
-      if (this.isSuccess) {
-        playerData.gamesWon += 1
-      }
-      
-      // 更新最佳评级
-      if (!playerData.bestGrade || compareGrade(this.finalGrade, playerData.bestGrade) > 0) {
-        playerData.bestGrade = this.finalGrade
-      }
-      
-      // 添加晶核
-      updateCrystals(this.crystalReward)
-      
-      savePlayerData(playerData)
-    },
-    saveHistory() {
-      saveGameHistory({
-        productName: this.product.name,
-        productGrade: this.product.grade,
-        finalGrade: this.finalGrade,
-        completion: this.completion,
-        success: this.isSuccess,
-        crystalReward: this.crystalReward,
-        quarters: this.gameState.quarterIndex + 1
-      })
-    },
-    selectUpgrade(index) {
-      this.selectedUpgradeIndex = index
-      uni.vibrateShort({
-        type: 'light'
-      })
-    },
-    continueWithUpgrade() {
-      if (this.selectedUpgradeIndex === null) {
-        uni.showToast({
-          title: '请选择一个升级',
-          icon: 'none'
-        })
-        return
-      }
-      
-      const selectedUpgrade = this.tempUpgrades[this.selectedUpgradeIndex]
-      
-      // 应用临时升级
-      const newStats = applyTempUpgrade(this.gameState.playerStats, selectedUpgrade)
-      
-      // 恢复满体力
-      newStats.stamina = newStats.maxStamina || 50
-      
-      // 保存玩家数据用于下一局
-      const playerData = loadPlayerData()
-      playerData.vision = newStats.vision
-      playerData.luck = newStats.luck
-      playerData.stamina = newStats.stamina
-      playerData.maxStamina = newStats.maxStamina || playerData.maxStamina
-      playerData.tempUpgrades = newStats.tempUpgrades || []
-      
-      savePlayerData(playerData)
-      
-      // 清除当前游戏状态
-      clearGameState()
-      
-      // 返回首页开始新游戏
+// 状态数据
+const gameState = ref(null)
+const product = ref(null)
+const isSuccess = ref(false)
+const completion = ref(0)
+const finalGrade = ref('C')
+const gradeChange = ref(0)
+const crystalReward = ref(0)
+const resultData = ref({
+  title: '',
+  description: '',
+  emoji: ''
+})
+const tempUpgrades = ref([])
+const selectedUpgradeIndex = ref(null)
+const isGameOver = ref(false)
+
+// 方法
+const initResult = () => {
+  gameState.value = loadGameState()
+  
+  if (!gameState.value) {
+    uni.showToast({
+      title: '数据错误',
+      icon: 'none'
+    })
+    setTimeout(() => {
       uni.reLaunch({
         url: '/pages/home/home'
       })
-      
-      // 提示
-      setTimeout(() => {
-        uni.showToast({
-          title: `获得了 ${selectedUpgrade.name}！`,
-          icon: 'success'
-        })
-      }, 500)
-    },
-    backToHome() {
-      clearGameState()
-      uni.reLaunch({
-        url: '/pages/home/home'
-      })
-    },
-    goToUpgrade() {
-      clearGameState()
-      uni.reLaunch({
-        url: '/pages/upgrade/upgrade'
-      })
-    }
+    }, 1500)
+    return
+  }
+  
+  product.value = gameState.value.product
+  
+  if (isSuccess.value) {
+    processSuccess()
+  } else {
+    processFailure()
+  }
+  
+  // 更新玩家数据
+  updatePlayerData()
+  
+  // 保存游戏历史
+  saveHistory()
+}
+
+const processSuccess = () => {
+  const battleResult = gameState.value.battleResult
+  completion.value = battleResult.completion
+  
+  // 计算产品评级
+  const gradeResult = calculateProductGrade(
+    product.value,
+    completion.value,
+    gameState.value.playerStats.luck,
+    gameState.value.playerStats.tempUpgrades
+  )
+  
+  finalGrade.value = gradeResult.grade
+  gradeChange.value = gradeResult.gradeChange
+  
+  // 生成市场反响
+  resultData.value = generateMarketResponse(
+    product.value,
+    finalGrade.value,
+    completion.value
+  )
+  
+  // 计算奖励
+  crystalReward.value = calculateReward(
+    product.value,
+    finalGrade.value,
+    completion.value
+  )
+  
+  // 判断是否通关
+  isGameOver.value = (finalGrade.value === 'A' || finalGrade.value === 'S')
+  
+  // 如果未通关，生成临时升级选项
+  if (!isGameOver.value) {
+    tempUpgrades.value = getRandomTempUpgrades(3)
   }
 }
+
+const processFailure = () => {
+  const battleResult = gameState.value.battleResult
+  completion.value = battleResult ? battleResult.completion : 0
+  
+  finalGrade.value = product.value.grade
+  
+  // 生成失败描述
+  resultData.value = generateFailureResponse(
+    product.value,
+    completion.value
+  )
+  
+  // 计算失败奖励
+  crystalReward.value = calculateFailureReward(
+    product.value,
+    completion.value
+  )
+  
+  isGameOver.value = true
+}
+
+const updatePlayerData = () => {
+  const playerData = loadPlayerData()
+  
+  // 更新游戏次数
+  playerData.gamesPlayed += 1
+  
+  // 更新成功次数
+  if (isSuccess.value) {
+    playerData.gamesWon += 1
+  }
+  
+  // 更新最佳评级
+  if (!playerData.bestGrade || compareGrade(finalGrade.value, playerData.bestGrade) > 0) {
+    playerData.bestGrade = finalGrade.value
+  }
+  
+  // 添加晶核
+  updateCrystals(crystalReward.value)
+  
+  savePlayerData(playerData)
+}
+
+const saveHistory = () => {
+  saveGameHistory({
+    productName: product.value.name,
+    productGrade: product.value.grade,
+    finalGrade: finalGrade.value,
+    completion: completion.value,
+    success: isSuccess.value,
+    crystalReward: crystalReward.value,
+    quarters: gameState.value.quarterIndex + 1
+  })
+}
+
+const selectUpgrade = (index) => {
+  selectedUpgradeIndex.value = index
+  uni.vibrateShort({
+    type: 'light'
+  })
+}
+
+const continueWithUpgrade = () => {
+  if (selectedUpgradeIndex.value === null) {
+    uni.showToast({
+      title: '请选择一个升级',
+      icon: 'none'
+    })
+    return
+  }
+  
+  const selectedUpgrade = tempUpgrades.value[selectedUpgradeIndex.value]
+  
+  // 应用临时升级
+  const newStats = applyTempUpgrade(gameState.value.playerStats, selectedUpgrade)
+  
+  // 恢复满体力
+  newStats.stamina = newStats.maxStamina || 50
+  
+  // 保存玩家数据用于下一局
+  const playerData = loadPlayerData()
+  playerData.vision = newStats.vision
+  playerData.luck = newStats.luck
+  playerData.stamina = newStats.stamina
+  playerData.maxStamina = newStats.maxStamina || playerData.maxStamina
+  playerData.tempUpgrades = newStats.tempUpgrades || []
+  
+  savePlayerData(playerData)
+  
+  // 清除当前游戏状态
+  clearGameState()
+  
+  // 返回首页开始新游戏
+  uni.reLaunch({
+    url: '/pages/home/home'
+  })
+  
+  // 提示
+  setTimeout(() => {
+    uni.showToast({
+      title: `获得了 ${selectedUpgrade.name}！`,
+      icon: 'success'
+    })
+  }, 500)
+}
+
+const backToHome = () => {
+  clearGameState()
+  uni.reLaunch({
+    url: '/pages/home/home'
+  })
+}
+
+const goToUpgrade = () => {
+  clearGameState()
+  uni.reLaunch({
+    url: '/pages/upgrade/upgrade'
+  })
+}
+
+// 生命周期
+onLoad((options) => {
+  isSuccess.value = options.success === 'true'
+  initResult()
+})
 </script>
 
 <style scoped>

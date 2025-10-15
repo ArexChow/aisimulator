@@ -75,95 +75,99 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { loadPlayerData, purchaseUpgrade, savePlayerData } from '@/utils/storage'
 import { permanentUpgrades, calculatePermanentBonus } from '@/data/upgrades'
 
-export default {
-  data() {
-    return {
-      playerData: {
-        crystals: 0,
-        permanentUpgrades: {
-          vision: 0,
-          luck: 0,
-          stamina: 0
-        }
-      },
-      upgradeConfigs: permanentUpgrades
-    }
-  },
-  onLoad() {
-    this.loadData()
-  },
-  methods: {
-    loadData() {
-      this.playerData = loadPlayerData()
-    },
-    getTotalBonus(attr) {
-      const level = this.playerData.permanentUpgrades[attr]
-      const config = this.upgradeConfigs[attr]
-      let total = 0
-      
-      for (let i = 0; i < level; i++) {
-        if (config.levels[i]) {
-          total += config.levels[i].bonus
-        }
-      }
-      
-      return total
-    },
-    getNextLevel(attr) {
-      const currentLevel = this.playerData.permanentUpgrades[attr]
-      const config = this.upgradeConfigs[attr]
-      
-      if (currentLevel >= config.levels.length) {
-        return null
-      }
-      
-      return config.levels[currentLevel]
-    },
-    canUpgrade(attr) {
-      const nextLevel = this.getNextLevel(attr)
-      if (!nextLevel) return false
-      
-      return this.playerData.crystals >= nextLevel.cost
-    },
-    doUpgrade(attr) {
-      if (!this.canUpgrade(attr)) {
-        uni.showToast({
-          title: '晶核不足',
-          icon: 'none'
-        })
-        return
-      }
-      
-      const nextLevel = this.getNextLevel(attr)
-      const result = purchaseUpgrade(attr, nextLevel.cost)
-      
-      if (result.success) {
-        this.playerData = result.data
-        
-        // 显示升级成功动画
-        uni.showToast({
-          title: `${this.upgradeConfigs[attr].name}升级成功！`,
-          icon: 'success'
-        })
-        
-        // 震动反馈
-        uni.vibrateShort()
-      } else {
-        uni.showToast({
-          title: result.message,
-          icon: 'none'
-        })
-      }
-    },
-    goBack() {
-      uni.navigateBack()
+// 状态数据
+const playerData = ref({
+  crystals: 0,
+  permanentUpgrades: {
+    vision: 0,
+    luck: 0,
+    stamina: 0
+  }
+})
+const upgradeConfigs = permanentUpgrades
+
+// 方法
+const loadData = () => {
+  playerData.value = loadPlayerData()
+}
+
+const getTotalBonus = (attr) => {
+  const level = playerData.value.permanentUpgrades[attr]
+  const config = upgradeConfigs[attr]
+  let total = 0
+  
+  for (let i = 0; i < level; i++) {
+    if (config.levels[i]) {
+      total += config.levels[i].bonus
     }
   }
+  
+  return total
 }
+
+const getNextLevel = (attr) => {
+  const currentLevel = playerData.value.permanentUpgrades[attr]
+  const config = upgradeConfigs[attr]
+  
+  if (currentLevel >= config.levels.length) {
+    return null
+  }
+  
+  return config.levels[currentLevel]
+}
+
+const canUpgrade = (attr) => {
+  const nextLevel = getNextLevel(attr)
+  if (!nextLevel) return false
+  
+  return playerData.value.crystals >= nextLevel.cost
+}
+
+const doUpgrade = (attr) => {
+  if (!canUpgrade(attr)) {
+    uni.showToast({
+      title: '晶核不足',
+      icon: 'none'
+    })
+    return
+  }
+  
+  const nextLevel = getNextLevel(attr)
+  const result = purchaseUpgrade(attr, nextLevel.cost)
+  
+  if (result.success) {
+    playerData.value = result.data
+    
+    // 显示升级成功动画
+    uni.showToast({
+      title: `${upgradeConfigs[attr].name}升级成功！`,
+      icon: 'success'
+    })
+    
+    // 震动反馈
+    uni.vibrateShort()
+  } else {
+    uni.showToast({
+      title: result.message,
+      icon: 'none'
+    })
+  }
+}
+
+const goBack = () => {
+  uni.navigateBack()
+}
+
+// 生命周期
+onLoad(() => {
+  loadData()
+})
 </script>
 
 <style scoped>
