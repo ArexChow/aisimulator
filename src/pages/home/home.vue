@@ -4,7 +4,7 @@
     <view class="crt-screen header-screen">
       <view class="terminal-text">
         <text class="blink">█</text>
-        <text> PROGRAMMER SIMULATOR </text>
+        <text> HELLO WORLD </text>
         <text class="blink">█</text>
       </view>
       <view class="terminal-subtitle">

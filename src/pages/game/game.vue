@@ -149,8 +149,8 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
-import { loadPlayerData, saveGameState, clearGameState } from '@/utils/storage'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { loadPlayerData, saveGameState, clearGameState, loadGameState } from '@/utils/storage'
 import { selectRandomProduct } from '@/data/products'
 
 // 状态数据
@@ -206,6 +206,20 @@ const initGame = () => {
   
   // 保存游戏状态
   saveState()
+}
+
+const refreshGameState = () => {
+  // 从存储中加载最新的游戏状态
+  const savedState = loadGameState()
+  
+  if (savedState && savedState.product) {
+    // 更新游戏状态
+    currentProduct.value = savedState.product
+    playerStats.value = savedState.playerStats
+    quarterIndex.value = savedState.quarterIndex || 0
+    selectedSolutions.value = savedState.selectedSolutions || []
+    currentYear.value = savedState.currentYear || currentProduct.value.year
+  }
 }
 
 const saveState = () => {
@@ -267,6 +281,11 @@ const getCategoryName = (category) => {
 // 生命周期
 onLoad(() => {
   initGame()
+})
+
+onShow(() => {
+  // 页面显示时刷新游戏状态（从其他页面返回时）
+  refreshGameState()
 })
 </script>
 
