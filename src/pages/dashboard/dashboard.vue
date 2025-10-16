@@ -222,11 +222,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onLoad, onShow, onHide } from '@dcloudio/uni-app'
-import { loadGameState, saveGameState, addNews, updateProduct, updateEmployee, removeProduct, removeEmployee } from '@/utils/storage'
+import { loadGameState, saveGameState, addNews, updateProduct, updateEmployee, removeProduct, removeEmployee, updateFinancingCooldown, addFinancing } from '@/utils/storage'
 import { TimeManager, formatTime, getCurrentEra } from '@/utils/timeSystem'
 import { updateEmployeeWeekly, getEmployeeStatusText, pepTalk as doPepTalk, walkBy as doWalkBy, fireEmployee, calculateMonthlySalaries } from '@/utils/employeeManager'
-import { settleWeeklyFinance, checkBankruptcy, getMoneyStatus, formatMoney } from '@/utils/financeManager'
-import { updateProductWeekly } from '@/data/growthRules'
+import { settleWeeklyFinance, checkBankruptcy, getMoneyStatus, formatMoney, requestFinancing, FINANCING_CONFIG } from '@/utils/financeManager'
+import { updateProductWeekly, applyUpgrade, applyPromotion, PROMOTION_METHODS } from '@/data/growthRules'
+import { getThemeByYear, getThemeChangeMessage } from '@/utils/themeSystem'
+import { generateRandomNews, checkMilestoneEvent, generateProductNews } from '@/data/newsEvents'
+import { getSolution, calculateInitialDAU, calculateInitialRating } from '@/data/solutions'
 
 // 状态数据
 const gameState = ref(null)
@@ -273,7 +276,6 @@ const initGame = () => {
   timeManager.value.on('onWeekPass', handleWeekPass)
   
   // 初始化主题
-  const { getThemeByYear } = require('@/utils/themeSystem')
   const currentEra = getCurrentEra(gameState.value.currentYear)
   lastEra.value = currentEra
   currentTheme.value = getThemeByYear(gameState.value.currentYear)
@@ -339,7 +341,6 @@ const handleWeekPass = (timeData) => {
   })
   
   // 3. 更新融资冷却
-  const { updateFinancingCooldown } = require('@/utils/storage')
   updateFinancingCooldown(gameState.value)
   
   // 4. 财务结算
@@ -370,7 +371,6 @@ const handleWeekPass = (timeData) => {
   // 6. 检查时代切换
   const currentEra = getCurrentEra(gameState.value.currentYear)
   if (lastEra.value !== currentEra) {
-    const { getThemeByYear, getThemeChangeMessage } = require('@/utils/themeSystem')
     const newTheme = getThemeByYear(gameState.value.currentYear)
     currentTheme.value = newTheme
     lastEra.value = currentEra
@@ -384,8 +384,6 @@ const handleWeekPass = (timeData) => {
   
   // 7. 生成随机新闻（每4周一次）
   if (gameState.value.currentWeek % 4 === 0) {
-    const { generateRandomNews, checkMilestoneEvent, generateProductNews } = require('@/data/newsEvents')
-    
     // 检查里程碑事件
     const milestone = checkMilestoneEvent(gameState.value.currentYear)
     if (milestone) {
@@ -427,9 +425,9 @@ const launchProduct = (product) => {
   })
   
   // 设置初始DAU和评价
-  const solution = require('@/data/solutions').getSolution(product.developmentSolution)
-  product.dau = require('@/data/solutions').calculateInitialDAU(product.grade, solution.quality)
-  product.userRating = require('@/data/solutions').calculateInitialRating(product.grade, solution.quality)
+  const solution = getSolution(product.developmentSolution)
+  product.dau = calculateInitialDAU(product.grade, solution.quality)
+  product.userRating = calculateInitialRating(product.grade, solution.quality)
   
   addNews(gameState.value, {
     content: `🎉 ${product.name} 正式上线！初始DAU: ${formatNumber(product.dau)}`
@@ -449,8 +447,7 @@ const completeUpgrade = (product) => {
   })
   
   // 应用升级效果
-  const solution = require('@/data/solutions').getSolution(product.developmentSolution)
-  const { applyUpgrade } = require('@/data/growthRules')
+  const solution = getSolution(product.developmentSolution)
   applyUpgrade(product, solution.quality)
   
   addNews(gameState.value, {
@@ -528,8 +525,6 @@ const promoteProduct = (product) => {
       const promotionTypes = ['social', 'search', 'tv']
       const selectedType = promotionTypes[res.tapIndex]
       
-      const { applyPromotion } = require('@/data/growthRules')
-      const { PROMOTION_METHODS } = require('@/data/growthRules')
       const method = PROMOTION_METHODS[selectedType]
       
       // 检查资金
@@ -652,8 +647,6 @@ const confirmFire = (employee) => {
 }
 
 const showFinanceDialog = () => {
-  const { requestFinancing, FINANCING_CONFIG } = require('@/utils/financeManager')
-  
   // 检查融资历史和冷却
   const result = requestFinancing(gameState.value.money, gameState.value.financingHistory)
   
@@ -674,7 +667,6 @@ const showFinanceDialog = () => {
     success: (res) => {
       if (res.confirm) {
         // 执行融资
-        const { addFinancing } = require('@/utils/storage')
         addFinancing(gameState.value, FINANCING_CONFIG.amount)
         
         addNews(gameState.value, {
@@ -739,8 +731,18 @@ onLoad(() => {
 })
 
 onShow(() => {
-  if (gameState.value && timeManager.value && !isPaused.value) {
-    timeManager.value.start()
+  // 重新加载游戏状态以获取最新数据
+  const latestState = loadGameState()
+  if (latestState) {
+    gameState.value = latestState
+    
+    // 如果时间管理器存在且未暂停，则继续运行
+    if (timeManager.value) {
+      timeManager.value.setTime(latestState.currentYear, latestState.currentWeek)
+      if (!isPaused.value) {
+        timeManager.value.start()
+      }
+    }
   }
 })
 

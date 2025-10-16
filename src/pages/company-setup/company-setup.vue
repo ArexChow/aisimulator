@@ -33,7 +33,7 @@
     </view>
 
     <!-- 初始资金 -->
-    <view class="pixel-card mt-30">
+    <view class="pixel-card mt-30" v-if="initialEmployee">
       <view class="pixel-subtitle text-center">初始资源</view>
       <view class="resource-item">
         <view class="resource-icon">💰</view>
@@ -52,7 +52,7 @@
     </view>
 
     <!-- 初始员工信息 -->
-    <view class="pixel-card mt-30">
+    <view class="pixel-card mt-30" v-if="initialEmployee">
       <view class="pixel-subtitle text-center">初始员工资料</view>
       <view class="employee-profile">
         <view class="employee-header">
