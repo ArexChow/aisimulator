@@ -36,13 +36,35 @@
           </view>
         </view>
         
+        <!-- 产品Logo横向滚动栏 -->
+        <scroll-view 
+          v-if="gameState.products.length > 0"
+          scroll-x 
+          class="product-logo-scroll"
+          :show-scrollbar="false"
+        >
+          <view class="product-logo-list">
+            <!-- 各个产品Logo -->
+            <view 
+              v-for="product in gameState.products" 
+              :key="product.instanceId"
+              class="product-logo-item"
+              :class="{ 'logo-active': selectedProductFilter === product.instanceId }"
+              @click="selectProductFilter(product.instanceId)"
+            >
+              <view class="logo-icon">{{ product.logo }}</view>
+              <view class="logo-name">{{ product.name }}</view>
+            </view>
+          </view>
+        </scroll-view>
+        
         <scroll-view scroll-y class="content-scroll">
           <view class="empty-hint" v-if="gameState.products.length === 0">
             还没有产品，点击"新产品"开始开发吧！
           </view>
           
           <view 
-            v-for="product in gameState.products" 
+            v-for="product in filteredProducts" 
             :key="product.instanceId"
             class="product-card pixel-card"
           >
@@ -240,6 +262,7 @@ const lastEra = ref(null)
 const currentTab = ref('products')
 const unreadNewsCount = ref(0)
 const lastReadNewsId = ref(0)
+const selectedProductFilter = ref(null) // null表示显示所有产品，否则为产品instanceId
 
 // 计算属性
 const timeDisplay = computed(() => {
@@ -250,6 +273,12 @@ const timeDisplay = computed(() => {
 const moneyStatus = computed(() => {
   if (!gameState.value) return 'safe'
   return getMoneyStatus(gameState.value.money)
+})
+
+const filteredProducts = computed(() => {
+  if (!gameState.value) return []
+  if (!selectedProductFilter.value) return gameState.value.products
+  return gameState.value.products.filter(p => p.instanceId === selectedProductFilter.value)
 })
 
 // 方法
@@ -693,6 +722,20 @@ const switchTab = (tab) => {
   if (tab === 'news' && gameState.value && gameState.value.news.length > 0) {
     unreadNewsCount.value = 0
     lastReadNewsId.value = gameState.value.news[0].id
+  }
+  
+  // 切换tab时，重置产品筛选
+  if (tab !== 'products') {
+    selectedProductFilter.value = null
+  }
+}
+
+const selectProductFilter = (productInstanceId) => {
+  if (selectedProductFilter.value === productInstanceId) {
+    // 如果点击当前选中的产品，取消筛选
+    selectedProductFilter.value = null
+  } else {
+    selectedProductFilter.value = productInstanceId
   }
 }
 
@@ -1212,6 +1255,61 @@ onUnmounted(() => {
   25%, 75% {
     opacity: 0.6;
   }
+}
+
+/* 产品Logo滚动栏 */
+.product-logo-scroll {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 20rpx;
+  background: #FFF;
+  border: 3px solid #3E2723;
+  padding: 15rpx 0;
+}
+
+.product-logo-list {
+  display: inline-flex;
+  gap: 15rpx;
+  padding: 0 20rpx;
+}
+
+.product-logo-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 15rpx 20rpx;
+  background: #FFF9C4;
+  border: 3px solid #3E2723;
+  min-width: 120rpx;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.product-logo-item.logo-active {
+  background: #FFC107;
+  border-width: 4px;
+  box-shadow: 0 0 0 3px #FFA000;
+  transform: scale(1.05);
+}
+
+.logo-icon {
+  font-size: 48rpx;
+  margin-bottom: 8rpx;
+}
+
+.logo-name {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #3E2723;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120rpx;
+}
+
+.logo-active .logo-name {
+  color: #5D4037;
 }
 </style>
 

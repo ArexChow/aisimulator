@@ -1128,6 +1128,7 @@ export function createProductInstance(templateId, customName, monetization, assi
     description: template.description,
     category: template.category,
     grade: template.grade,
+    logo: PRODUCT_CATEGORIES[template.category].icon, // 产品logo，使用分类图标
     monetization: monetization || template.defaultMonetization,
     
     // 研发相关
