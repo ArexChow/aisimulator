@@ -3,7 +3,47 @@
 		{
 			"path": "pages/home/home",
 			"style": {
-				"navigationBarTitleText": "程序员模拟器",
+				"navigationBarTitleText": "软件开发物语",
+				"navigationBarBackgroundColor": "#3E2723",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/company-setup/company-setup",
+			"style": {
+				"navigationBarTitleText": "创建公司",
+				"navigationBarBackgroundColor": "#3E2723",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/dashboard/dashboard",
+			"style": {
+				"navigationBarTitleText": "经营中",
+				"navigationBarBackgroundColor": "#3E2723",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/new-product/new-product",
+			"style": {
+				"navigationBarTitleText": "新建产品",
+				"navigationBarBackgroundColor": "#3E2723",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/recruit/recruit",
+			"style": {
+				"navigationBarTitleText": "招聘员工",
+				"navigationBarBackgroundColor": "#3E2723",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/training/training",
+			"style": {
+				"navigationBarTitleText": "员工培训",
 				"navigationBarBackgroundColor": "#3E2723",
 				"navigationBarTextStyle": "white"
 			}

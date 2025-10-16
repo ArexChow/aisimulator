@@ -2,7 +2,7 @@
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 
 onLaunch(() => {
-  console.log('程序员模拟器启动')
+  console.log('软件开发物语启动')
 })
 
 onShow(() => {

@@ -1,98 +1,87 @@
 <template>
-  <view class="quarter-task-page">
-    <view class="pixel-title">选择开发方案</view>
+  <view class="upgrade-page">
+    <view class="pixel-subtitle text-center">产品升级</view>
 
-    <!-- 任务信息 -->
-    <view v-if="currentQuarter" class="pixel-card">
-      <view class="task-title">
-        第{{ quarterIndex + 1 }}季度: {{ currentQuarter.name }}
-      </view>
-      <view class="task-desc">{{ currentQuarter.desc }}</view>
-    </view>
-
-    <!-- 方案选择 -->
-    <view v-if="solutions.length > 0" class="solutions-list mt-30">
-      <view 
-        v-for="(solution, index) in solutions" 
-        :key="solution.id"
-        class="solution-card pixel-card"
-        :class="{ 'pixel-card-active': selectedIndex === index }"
-        @click="selectSolution(index)"
-      >
-        <view class="solution-header">
-          <view class="solution-name">{{ solution.name }}</view>
-          <view class="solution-badge">
-            方案 {{ index + 1 }}
-          </view>
+    <!-- 产品信息 -->
+    <view class="pixel-card mt-30" v-if="product">
+      <view class="product-header">
+        <view class="product-name">{{ product.name }}</view>
+        <view class="pixel-badge" :class="'badge-' + product.grade.toLowerCase()">
+          {{ product.grade }}级
         </view>
-
-        <view class="solution-desc mt-20">
-          {{ solution.description }}
-        </view>
-
-        <!-- 方案属性 -->
-        <view class="solution-stats mt-30">
-          <view class="stat-row">
-            <text class="stat-label">💪 体力消耗</text>
-            <text class="stat-value">-{{ solution.stamina }}</text>
-          </view>
-          <view class="stat-row">
-            <text class="stat-label">⭐ 质量影响</text>
-            <text class="stat-value">{{ (solution.qualityImpact * 100).toFixed(0) }}%</text>
-          </view>
-          <view class="stat-row">
-            <text class="stat-label">⚡ 进度速度</text>
-            <text class="stat-value">{{ (solution.progressSpeed * 100).toFixed(0) }}%</text>
-          </view>
-        </view>
-
-        <!-- Todo预览 -->
-        <view class="todos-preview mt-30">
-          <view class="todos-title">📋 开发任务清单</view>
-          <view class="todos-list">
-            <view 
-              v-for="(todo, i) in solution.todos" 
-              :key="i"
-              class="todo-item"
-            >
-              <text class="todo-checkbox">[ ]</text>
-              <text class="todo-text">{{ todo }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 体力警告 -->
-        <view 
-          v-if="playerStats.stamina < solution.stamina"
-          class="warning-box mt-20"
-        >
-          ⚠️ 体力不足，选择此方案可能导致失败
-        </view>
-      </view>
-    </view>
-
-    <!-- 当前体力提示 -->
-    <view class="pixel-card mt-30">
-      <view class="stamina-info">
-        <text class="info-label">当前体力:</text>
-        <view class="pixel-progress">
-          <view 
-            class="pixel-progress-bar"
-            :class="{ 'bar-warning': staminaPercent < 60, 'bar-danger': staminaPercent < 30 }"
-            :style="{width: staminaPercent + '%'}"
-          ></view>
-        </view>
-        <text class="info-value">{{ playerStats.stamina }} / {{ playerStats.maxStamina }}</text>
       </view>
       
-      <view v-if="selectedIndex !== null" class="stamina-after mt-20">
-        <text class="after-label">完成后剩余:</text>
-        <text 
-          class="after-value"
-          :class="{ 'value-danger': remainingStamina < 20 }"
+      <view class="product-current-stats">
+        <view class="stat-item">
+          <text class="stat-label">当前DAU:</text>
+          <text class="stat-value">{{ formatNumber(product.dau) }}</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-label">月收入:</text>
+          <text class="stat-value">¥{{ formatMoney(product.monthlyRevenue) }}</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-label">用户评价:</text>
+          <text class="stat-value">{{ '⭐'.repeat(Math.floor(product.userRating)) }} {{ product.userRating.toFixed(1) }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 升级方案 -->
+    <view class="pixel-card mt-30">
+      <view class="section-title">选择升级方案</view>
+      
+      <view class="solutions-list">
+        <view 
+          v-for="solution in solutions" 
+          :key="solution.id"
+          class="solution-card"
+          :class="{ 'solution-selected': selectedSolution === solution.id }"
+          @click="selectSolution(solution.id)"
         >
-          {{ remainingStamina }}
-        </text>
+          <view class="solution-header">
+            <view class="solution-name">{{ solution.name }}</view>
+            <view class="solution-weeks">{{ solution.weeks }}周</view>
+          </view>
+          <view class="solution-desc">{{ solution.description }}</view>
+          <view class="solution-requirement">
+            需要: {{ solution.requiredEmployees }}人
+          </view>
+          <view class="solution-effect" v-if="upgradeEffect && selectedSolution === solution.id">
+            <view class="effect-title">预计效果:</view>
+            <view class="effect-item">DAU +{{ formatNumber(upgradeEffect.dauIncrease) }}</view>
+            <view class="effect-item">评价 +{{ upgradeEffect.ratingIncrease.toFixed(1) }}⭐</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 分配员工 -->
+    <view class="pixel-card mt-30" v-if="selectedSolution">
+      <view class="section-title">
+        分配员工 ({{ selectedEmployees.length }}/{{ requiredEmployeeCount }})
+      </view>
+      
+      <view class="employees-list">
+        <view 
+          v-for="employee in idleEmployees" 
+          :key="employee.id"
+          class="employee-item"
+          :class="{ 'employee-selected': isEmployeeSelected(employee.id) }"
+          @click="toggleEmployee(employee)"
+        >
+          <view class="employee-item-name">{{ employee.name }}</view>
+          <view class="employee-item-abilities">
+            💻{{ employee.programming }} 🎨{{ employee.art }} 💼{{ employee.business }}
+          </view>
+        </view>
+      </view>
+      
+      <view class="hint-text" v-if="idleEmployees.length === 0">
+        没有空闲员工
+      </view>
+      <view class="hint-text" v-else-if="idleEmployees.length < requiredEmployeeCount">
+        空闲员工数量不足，至少需要{{ requiredEmployeeCount }}人
       </view>
     </view>
 
@@ -100,66 +89,69 @@
     <view class="button-group mt-40">
       <view 
         class="pixel-btn pixel-btn-success"
-        :class="{ 'pixel-btn-disabled': selectedIndex === null }"
-        @click="confirmSelection"
+        :class="{ 'pixel-btn-disabled': !canStartUpgrade }"
+        @click="startUpgrade"
       >
-        确认方案 ✓
+        开始升级 ▶
       </view>
       <view class="pixel-btn mt-20" @click="goBack">
-        ← 返回
+        返回
       </view>
     </view>
   </view>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { loadGameState, saveGameState } from '@/utils/storage'
-import { generateSolutions } from '@/data/solutions'
-import { applySolutionModifiers } from '@/utils/gameLogic'
+import { loadGameState, saveGameState, addNews } from '@/utils/storage'
+import { getAllSolutions, generateDevelopmentTasks } from '@/data/solutions'
+import { getIdleEmployees, assignEmployeeToProduct } from '@/utils/employeeManager'
+import { calculateUpgradeEffect } from '@/utils/balanceSystem'
+import { formatMoney } from '@/utils/financeManager'
 
 // 状态数据
 const gameState = ref(null)
-const currentQuarter = ref(null)
-const quarterIndex = ref(0)
+const product = ref(null)
+const selectedSolution = ref(null)
+const selectedEmployees = ref([])
 const solutions = ref([])
-const selectedIndex = ref(null)
-const playerStats = ref({
-  stamina: 50,
-  maxStamina: 50
-})
+const idleEmployees = ref([])
+const upgradeEffect = ref(null)
 
 // 计算属性
-const staminaPercent = computed(() => {
-  return (playerStats.value.stamina / playerStats.value.maxStamina * 100)
+const requiredEmployeeCount = computed(() => {
+  const solution = solutions.value.find(s => s.id === selectedSolution.value)
+  return solution ? solution.requiredEmployees : 1
 })
 
-const remainingStamina = computed(() => {
-  if (selectedIndex.value === null) return playerStats.value.stamina
-  return playerStats.value.stamina - solutions.value[selectedIndex.value].stamina
+const canStartUpgrade = computed(() => {
+  return selectedSolution.value && 
+         selectedEmployees.value.length >= requiredEmployeeCount.value
 })
 
 // 方法
-const initTask = () => {
-  // 加载游戏状态
+const initData = () => {
   gameState.value = loadGameState()
-  
   if (!gameState.value) {
     uni.showToast({
-      title: '游戏状态错误',
+      title: '未找到游戏存档',
       icon: 'none'
     })
     setTimeout(() => {
-      uni.navigateBack()
+      uni.reLaunch({ url: '/pages/home/home' })
     }, 1500)
     return
   }
   
-  // 验证游戏状态的完整性
-  if (!gameState.value.product || !gameState.value.product.quarters) {
+  // 从URL获取产品ID
+  const pages = getCurrentPages()
+  const currentPage = pages[pages.length - 1]
+  const productId = currentPage.options.productId
+  
+  if (!productId) {
     uni.showToast({
-      title: '产品数据错误',
+      title: '产品ID不存在',
       icon: 'none'
     })
     setTimeout(() => {
@@ -168,16 +160,12 @@ const initTask = () => {
     return
   }
   
-  playerStats.value = gameState.value.playerStats || {
-    stamina: 50,
-    maxStamina: 50
-  }
-  quarterIndex.value = gameState.value.quarterIndex || 0
-  currentQuarter.value = gameState.value.product.quarters[quarterIndex.value]
+  // 查找产品
+  product.value = gameState.value.products.find(p => p.instanceId == productId)
   
-  if (!currentQuarter.value) {
+  if (!product.value) {
     uni.showToast({
-      title: '季度数据错误',
+      title: '产品不存在',
       icon: 'none'
     })
     setTimeout(() => {
@@ -186,51 +174,110 @@ const initTask = () => {
     return
   }
   
-  // 生成方案
-  let baseSolutions = generateSolutions(gameState.value.product, quarterIndex.value)
+  // 加载升级方案
+  solutions.value = getAllSolutions()
   
-  // 应用临时升级对方案的影响
-  if (playerStats.value.tempUpgrades && playerStats.value.tempUpgrades.length > 0) {
-    solutions.value = baseSolutions.map(s => 
-      applySolutionModifiers(s, playerStats.value.tempUpgrades)
+  // 加载空闲员工
+  idleEmployees.value = getIdleEmployees(gameState.value.employees)
+}
+
+const selectSolution = (solutionId) => {
+  selectedSolution.value = solutionId
+  selectedEmployees.value = []
+  
+  // 计算升级效果
+  if (selectedEmployees.value.length > 0) {
+    const solution = solutions.value.find(s => s.id === solutionId)
+    upgradeEffect.value = calculateUpgradeEffect(
+      product.value, 
+      selectedEmployees.value, 
+      solution.quality
+    )
+  }
+}
+
+const toggleEmployee = (employee) => {
+  const index = selectedEmployees.value.findIndex(e => e.id === employee.id)
+  if (index >= 0) {
+    selectedEmployees.value.splice(index, 1)
+  } else {
+    if (selectedEmployees.value.length < requiredEmployeeCount.value) {
+      selectedEmployees.value.push(employee)
+    } else {
+      uni.showToast({
+        title: `最多选择${requiredEmployeeCount.value}人`,
+        icon: 'none'
+      })
+    }
+  }
+  
+  // 重新计算升级效果
+  if (selectedEmployees.value.length > 0 && selectedSolution.value) {
+    const solution = solutions.value.find(s => s.id === selectedSolution.value)
+    upgradeEffect.value = calculateUpgradeEffect(
+      product.value, 
+      selectedEmployees.value, 
+      solution.quality
     )
   } else {
-    solutions.value = baseSolutions
+    upgradeEffect.value = null
   }
 }
 
-const selectSolution = (index) => {
-  selectedIndex.value = index
-  
-  // 震动反馈
-  uni.vibrateShort({
-    type: 'light'
-  })
+const isEmployeeSelected = (employeeId) => {
+  return selectedEmployees.value.some(e => e.id === employeeId)
 }
 
-const confirmSelection = () => {
-  if (selectedIndex.value === null) {
+const startUpgrade = () => {
+  if (!canStartUpgrade.value) {
     uni.showToast({
-      title: '请选择一个方案',
+      title: '请完成所有配置',
       icon: 'none'
     })
     return
   }
   
-  const selectedSolution = solutions.value[selectedIndex.value]
+  // 分配员工
+  selectedEmployees.value.forEach(emp => {
+    const employee = gameState.value.employees.find(e => e.id === emp.id)
+    if (employee) {
+      assignEmployeeToProduct(employee, product.value.instanceId)
+    }
+  })
   
-  // 保存选择的方案
-  if (!gameState.value.selectedSolutions) {
-    gameState.value.selectedSolutions = []
-  }
-  gameState.value.selectedSolutions.push(selectedSolution)
+  // 设置产品为升级中
+  product.value.status = 'developing'
+  product.value.developmentSolution = selectedSolution.value
+  product.value.assignedEmployees = selectedEmployees.value.map(e => e.id)
+  product.value.developmentProgress = 0
+  product.value.currentTodoIndex = 0
+  product.value.developmentTodos = generateDevelopmentTasks(selectedSolution.value, true)
   
+  // 添加新闻
+  const solution = solutions.value.find(s => s.id === selectedSolution.value)
+  addNews(gameState.value, {
+    content: `🔧 开始升级${product.value.name}，预计${solution.weeks}周完成`
+  })
+  
+  // 保存游戏状态
   saveGameState(gameState.value)
   
-  // 跳转到任务进行页面
-  uni.navigateTo({
-    url: '/pages/task-progress/task-progress'
+  // 返回主面板
+  uni.showToast({
+    title: '开始升级！',
+    icon: 'success'
   })
+  
+  setTimeout(() => {
+    uni.navigateBack()
+  }, 1000)
+}
+
+const formatNumber = (num) => {
+  if (num >= 10000) {
+    return (num / 10000).toFixed(1) + '万'
+  }
+  return num.toFixed(0)
 }
 
 const goBack = () => {
@@ -239,85 +286,48 @@ const goBack = () => {
 
 // 生命周期
 onLoad(() => {
-  initTask()
+  initData()
 })
 </script>
 
 <style scoped>
-.quarter-task-page {
+.upgrade-page {
   min-height: 100vh;
   padding: 40rpx;
   background: #F4E4C1;
   padding-bottom: 80rpx;
 }
 
-.task-title {
+.product-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.product-name {
   font-size: 36rpx;
   font-weight: bold;
   color: #3E2723;
-  margin-bottom: 15rpx;
 }
 
-.task-desc {
-  font-size: 28rpx;
-  color: #5D4037;
-  line-height: 1.6;
-}
-
-.solutions-list {
+.product-current-stats {
   display: flex;
   flex-direction: column;
-  gap: 30rpx;
+  gap: 15rpx;
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 2px solid #D7CCC8;
 }
 
-.solution-card {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.solution-header {
+.stat-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-}
-
-.solution-name {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #3E2723;
-}
-
-.solution-badge {
-  padding: 10rpx 20rpx;
-  background: #6D4C41;
-  color: #F4E4C1;
-  border: 2px solid #3E2723;
-  font-size: 22rpx;
-  font-weight: bold;
-}
-
-.solution-desc {
-  font-size: 26rpx;
-  color: #5D4037;
-  line-height: 1.8;
-}
-
-.solution-stats {
-  background: rgba(109, 76, 65, 0.1);
-  padding: 25rpx;
-  border: 2px solid #6D4C41;
-}
-
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 10rpx 0;
   font-size: 26rpx;
 }
 
 .stat-label {
-  font-weight: bold;
+  color: #5D4037;
 }
 
 .stat-value {
@@ -325,101 +335,122 @@ onLoad(() => {
   color: #3E2723;
 }
 
-.todos-preview {
-  background: #F4E4C1;
-  padding: 20rpx;
-  border: 3px solid #3E2723;
-}
-
-.todos-title {
-  font-size: 26rpx;
+.section-title {
+  font-size: 28rpx;
   font-weight: bold;
-  margin-bottom: 15rpx;
+  color: #3E2723;
+  margin-bottom: 20rpx;
 }
 
-.todos-list {
+.solutions-list {
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
-}
-
-.todo-item {
-  font-size: 24rpx;
-  display: flex;
-  gap: 10rpx;
-  line-height: 1.6;
-}
-
-.todo-checkbox {
-  color: #6D4C41;
-  font-weight: bold;
-}
-
-.todo-text {
-  color: #5D4037;
-  flex: 1;
-}
-
-.warning-box {
-  background: #FFE082;
-  border: 3px solid #FFA000;
-  padding: 20rpx;
-  font-size: 26rpx;
-  font-weight: bold;
-  color: #E65100;
-  text-align: center;
-}
-
-.stamina-info {
-  display: flex;
-  align-items: center;
   gap: 20rpx;
 }
 
-.info-label {
+.solution-card {
+  padding: 25rpx;
+  background: #FFF;
+  border: 3px solid #3E2723;
+  cursor: pointer;
+}
+
+.solution-selected {
+  background: #FFE082 !important;
+  border-color: #FFC107 !important;
+  border-width: 4px !important;
+}
+
+.solution-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15rpx;
+}
+
+.solution-name {
   font-size: 28rpx;
   font-weight: bold;
-  white-space: nowrap;
+  color: #3E2723;
 }
 
-.info-value {
-  font-size: 28rpx;
+.solution-weeks {
+  padding: 8rpx 16rpx;
+  background: #558B2F;
+  color: #FFF;
+  border: 2px solid #33691E;
+  font-size: 22rpx;
   font-weight: bold;
-  white-space: nowrap;
 }
 
-.stamina-info .pixel-progress {
-  flex: 1;
+.solution-desc {
+  font-size: 24rpx;
+  color: #5D4037;
+  line-height: 1.6;
+  margin-bottom: 10rpx;
 }
 
-.bar-warning .pixel-progress-bar {
-  background: #FFA726 !important;
+.solution-requirement {
+  font-size: 22rpx;
+  color: #8D6E63;
 }
 
-.bar-danger .pixel-progress-bar {
-  background: #E53935 !important;
-}
-
-.stamina-after {
-  text-align: center;
-  padding: 20rpx;
+.solution-effect {
+  margin-top: 20rpx;
+  padding: 15rpx;
   background: rgba(85, 139, 47, 0.1);
   border: 2px solid #558B2F;
 }
 
-.after-label {
-  font-size: 26rpx;
-  margin-right: 15rpx;
-}
-
-.after-value {
-  font-size: 36rpx;
+.effect-title {
+  font-size: 22rpx;
   font-weight: bold;
-  color: #558B2F;
+  color: #33691E;
+  margin-bottom: 10rpx;
 }
 
-.value-danger {
-  color: #E53935 !important;
+.effect-item {
+  font-size: 24rpx;
+  color: #558B2F;
+  margin: 5rpx 0;
+}
+
+.employees-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15rpx;
+}
+
+.employee-item {
+  padding: 20rpx;
+  background: #FFF;
+  border: 3px solid #3E2723;
+  cursor: pointer;
+}
+
+.employee-selected {
+  background: #FFE082 !important;
+  border-color: #FFC107 !important;
+  border-width: 4px !important;
+}
+
+.employee-item-name {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #3E2723;
+  margin-bottom: 8rpx;
+}
+
+.employee-item-abilities {
+  font-size: 22rpx;
+  color: #5D4037;
+}
+
+.hint-text {
+  font-size: 24rpx;
+  color: #8D6E63;
+  text-align: center;
+  padding: 20rpx;
 }
 
 .button-group {
@@ -427,4 +458,3 @@ onLoad(() => {
   flex-direction: column;
 }
 </style>
-
