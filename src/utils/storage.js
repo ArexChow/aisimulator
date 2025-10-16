@@ -2,7 +2,6 @@
 
 const STORAGE_KEYS = {
   GAME_STATE: 'game_state',
-  GAME_HISTORY: 'game_history',
   SETTINGS: 'settings'
 };
 
@@ -81,76 +80,6 @@ export function createNewGame(companyName) {
 export function hasSavedGame() {
   const state = loadGameState();
   return state !== null && state.companyName !== '';
-}
-
-// 保存游戏历史记录（游戏结束时）
-export function saveGameHistory(record) {
-  try {
-    let history = [];
-    const data = uni.getStorageSync(STORAGE_KEYS.GAME_HISTORY);
-    if (data) {
-      history = JSON.parse(data);
-    }
-    
-    history.unshift({
-      ...record,
-      timestamp: Date.now()
-    });
-    
-    // 只保留最近20条记录
-    if (history.length > 20) {
-      history = history.slice(0, 20);
-    }
-    
-    uni.setStorageSync(STORAGE_KEYS.GAME_HISTORY, JSON.stringify(history));
-    return true;
-  } catch (e) {
-    console.error('保存游戏历史失败:', e);
-    return false;
-  }
-}
-
-// 读取游戏历史记录
-export function loadGameHistory() {
-  try {
-    const data = uni.getStorageSync(STORAGE_KEYS.GAME_HISTORY);
-    if (data) {
-      return JSON.parse(data);
-    }
-  } catch (e) {
-    console.error('读取游戏历史失败:', e);
-  }
-  return [];
-}
-
-// 获取历史统计
-export function getHistoryStatistics() {
-  const history = loadGameHistory();
-  
-  if (history.length === 0) {
-    return {
-      gamesPlayed: 0,
-      totalRevenue: 0,
-      totalProducts: 0,
-      longestSurvival: 0,
-      peakMoney: 0,
-      bestProduct: null
-    };
-  }
-  
-  return {
-    gamesPlayed: history.length,
-    totalRevenue: history.reduce((sum, game) => sum + (game.statistics?.totalRevenue || 0), 0),
-    totalProducts: history.reduce((sum, game) => sum + (game.statistics?.productsLaunched || 0), 0),
-    longestSurvival: Math.max(...history.map(game => game.weeksPlayed || 0)),
-    peakMoney: Math.max(...history.map(game => game.statistics?.peakMoney || 0)),
-    bestProduct: history.reduce((best, game) => {
-      const gameBest = game.statistics?.bestProduct;
-      if (!gameBest) return best;
-      if (!best || gameBest.dau > best.dau) return gameBest;
-      return best;
-    }, null)
-  };
 }
 
 // 更新统计数据

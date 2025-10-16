@@ -1,7 +1,7 @@
 <template>
   <view class="dashboard-page">
     <!-- 顶部状态栏 -->
-    <view class="status-bar">
+    <view class="status-bar" v-if="gameState">
       <view class="company-info">
         <view class="company-name">{{ gameState.companyName }}</view>
         <view class="time-display">{{ timeDisplay }}</view>
@@ -21,9 +21,14 @@
     </view>
 
     <!-- 主要内容区 -->
-    <view class="main-content">
+    <view class="main-content" v-if="gameState">
+      <!-- 调试信息
+      <view style="position: fixed; top: 100rpx; left: 20rpx; z-index: 9999; background: red; color: white; padding: 10rpx; font-size: 24rpx;">
+        当前Tab: {{ currentTab }}
+      </view> -->
+      
       <!-- 产品区域 -->
-      <view class="section products-section">
+      <view class="tab-content products-tab" v-if="currentTab === 'products'">
         <view class="section-header">
           <text class="section-title">产品列表 ({{ gameState.products.length }})</text>
           <view class="pixel-btn-mini pixel-btn-success" @click="goToNewProduct">
@@ -31,7 +36,7 @@
           </view>
         </view>
         
-        <scroll-view scroll-y class="products-scroll">
+        <scroll-view scroll-y class="content-scroll">
           <view class="empty-hint" v-if="gameState.products.length === 0">
             还没有产品，点击"新产品"开始开发吧！
           </view>
@@ -91,7 +96,7 @@
       </view>
 
       <!-- 员工区域 -->
-      <view class="section employees-section">
+      <view class="tab-content employees-tab" v-if="currentTab === 'employees'">
         <view class="section-header">
           <text class="section-title">员工列表 ({{ gameState.employees.length }})</text>
           <view class="pixel-btn-mini pixel-btn-success" @click="goToRecruit">
@@ -99,7 +104,7 @@
           </view>
         </view>
         
-        <scroll-view scroll-y class="employees-scroll">
+        <scroll-view scroll-y class="content-scroll">
           <view 
             v-for="employee in gameState.employees" 
             :key="employee.id"
@@ -159,12 +164,12 @@
       </view>
 
       <!-- 新闻栏 -->
-      <view class="section news-section">
+      <view class="tab-content news-tab" v-if="currentTab === 'news'">
         <view class="section-header">
           <text class="section-title">新闻动态</text>
         </view>
         
-        <scroll-view scroll-y class="news-scroll">
+        <scroll-view scroll-y class="content-scroll">
           <view 
             v-for="newsItem in gameState.news.slice(0, 20)" 
             :key="newsItem.id"
@@ -178,6 +183,37 @@
             暂无新闻
           </view>
         </scroll-view>
+      </view>
+    </view>
+    
+    <!-- 底部Tab导航 -->
+    <view class="tab-bar" v-if="gameState">
+      <view 
+        class="tab-item" 
+        :class="{ active: currentTab === 'products' }"
+        @click="switchTab('products')"
+      >
+        <view class="tab-icon">📦</view>
+        <view class="tab-label">产品</view>
+      </view>
+      <view 
+        class="tab-item" 
+        :class="{ active: currentTab === 'employees' }"
+        @click="switchTab('employees')"
+      >
+        <view class="tab-icon">👥</view>
+        <view class="tab-label">员工</view>
+      </view>
+      <view 
+        class="tab-item" 
+        :class="{ active: currentTab === 'news' }"
+        @click="switchTab('news')"
+      >
+        <view class="tab-icon-wrapper">
+          <view class="tab-icon">📰</view>
+          <view class="tab-badge" v-if="unreadNewsCount > 0">{{ unreadNewsCount > 99 ? '99+' : unreadNewsCount }}</view>
+        </view>
+        <view class="tab-label">新闻</view>
       </view>
     </view>
   </view>
@@ -198,6 +234,9 @@ const timeManager = ref(null)
 const isPaused = ref(false)
 const currentTheme = ref(null)
 const lastEra = ref(null)
+const currentTab = ref('products')
+const unreadNewsCount = ref(0)
+const lastReadNewsId = ref(0)
 
 // 计算属性
 const timeDisplay = computed(() => {
@@ -238,6 +277,11 @@ const initGame = () => {
   const currentEra = getCurrentEra(gameState.value.currentYear)
   lastEra.value = currentEra
   currentTheme.value = getThemeByYear(gameState.value.currentYear)
+  
+  // 初始化未读新闻计数
+  if (gameState.value.news.length > 0) {
+    lastReadNewsId.value = gameState.value.news[0].id
+  }
   
   // 启动时间流逝
   timeManager.value.start()
@@ -365,6 +409,9 @@ const handleWeekPass = (timeData) => {
   
   // 8. 保存游戏状态
   saveGameState(gameState.value)
+  
+  // 9. 更新未读新闻计数
+  updateUnreadNewsCount()
 }
 
 const launchProduct = (product) => {
@@ -645,6 +692,47 @@ const showFinanceDialog = () => {
   })
 }
 
+const switchTab = (tab) => {
+  console.log('切换到tab:', tab, '当前tab:', currentTab.value)
+  currentTab.value = tab
+  console.log('切换后currentTab:', currentTab.value)
+  
+  // 切换到新闻tab时，清零未读计数
+  if (tab === 'news' && gameState.value && gameState.value.news.length > 0) {
+    unreadNewsCount.value = 0
+    lastReadNewsId.value = gameState.value.news[0].id
+  }
+}
+
+const updateUnreadNewsCount = () => {
+  if (!gameState.value || !gameState.value.news.length) {
+    unreadNewsCount.value = 0
+    return
+  }
+  
+  // 如果当前在新闻tab，不增加未读计数
+  if (currentTab.value === 'news') {
+    lastReadNewsId.value = gameState.value.news[0].id
+    unreadNewsCount.value = 0
+    return
+  }
+  
+  // 计算未读新闻数量
+  const latestNewsId = gameState.value.news[0].id
+  if (latestNewsId > lastReadNewsId.value) {
+    // 找到所有新增的新闻
+    let count = 0
+    for (let i = 0; i < gameState.value.news.length; i++) {
+      if (gameState.value.news[i].id > lastReadNewsId.value) {
+        count++
+      } else {
+        break
+      }
+    }
+    unreadNewsCount.value = count
+  }
+}
+
 // 生命周期
 onLoad(() => {
   initGame()
@@ -668,9 +756,11 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-page {
   min-height: 100vh;
+  height: 100vh;
   background: #F4E4C1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .status-bar {
@@ -743,21 +833,27 @@ onUnmounted(() => {
   text-align: center;
 }
 
+.pixel-btn-success {
+  background: #558B2F;
+  border-color: #33691E;
+}
+
 .main-content {
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20rpx;
-  padding: 20rpx;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.section {
+.tab-content {
+  flex: 1;
   display: flex;
   flex-direction: column;
   background: #FFF9C4;
-  border: 4px solid #3E2723;
+  border-top: 4px solid #3E2723;
   padding: 20rpx;
+  padding-bottom: 0;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
@@ -776,11 +872,42 @@ onUnmounted(() => {
   color: #3E2723;
 }
 
-.products-scroll,
-.employees-scroll,
-.news-scroll {
+.content-scroll {
   flex: 1;
   height: 0;
+}
+
+.pixel-card {
+  border: 3px solid #3E2723;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.pixel-badge {
+  padding: 5rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: bold;
+  border: 2px solid #3E2723;
+  display: inline-block;
+}
+
+.badge-s {
+  background: #9E9E9E;
+  color: #FFF;
+}
+
+.badge-a {
+  background: #42A5F5;
+  color: #FFF;
+}
+
+.badge-aa {
+  background: #AB47BC;
+  color: #FFF;
+}
+
+.badge-aaa {
+  background: #FFA726;
+  color: #FFF;
 }
 
 .product-card,
@@ -819,6 +946,18 @@ onUnmounted(() => {
 .product-development,
 .product-stats {
   margin: 15rpx 0;
+}
+
+.pixel-progress {
+  background: #D7CCC8;
+  border: 2px solid #3E2723;
+  overflow: hidden;
+}
+
+.pixel-progress-bar {
+  height: 100%;
+  background: #558B2F;
+  transition: width 0.3s;
 }
 
 .progress-bar-container {
@@ -988,6 +1127,89 @@ onUnmounted(() => {
   border: 2px solid #33691E;
   font-size: 20rpx;
   font-weight: bold;
+}
+
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: #3E2723;
+  border-top: 4px solid #F4E4C1;
+  padding: 10rpx 0;
+  z-index: 100;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 15rpx 0;
+  color: #8D6E63;
+  transition: all 0.3s;
+}
+
+.tab-item.active {
+  color: #F4E4C1;
+}
+
+.tab-item.active .tab-icon {
+  transform: scale(1.2);
+}
+
+.tab-icon-wrapper {
+  position: relative;
+}
+
+.tab-icon {
+  font-size: 40rpx;
+  margin-bottom: 5rpx;
+  transition: transform 0.3s;
+}
+
+.tab-label {
+  font-size: 22rpx;
+  font-weight: bold;
+}
+
+.tab-badge {
+  position: absolute;
+  top: -8rpx;
+  right: -20rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  background: #E53935;
+  color: #FFF;
+  font-size: 18rpx;
+  font-weight: bold;
+  border: 2px solid #FFF;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8rpx;
+  animation: badge-pulse 2s infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes blink {
+  0%, 50%, 100% {
+    opacity: 1;
+  }
+  25%, 75% {
+    opacity: 0.6;
+  }
 }
 </style>
 

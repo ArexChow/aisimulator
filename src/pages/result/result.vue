@@ -101,7 +101,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { loadGameState, clearGameState, saveGameHistory } from '@/utils/storage'
+import { loadGameState, clearGameState } from '@/utils/storage'
 import { getCurrentEra, getEraName } from '@/utils/timeSystem'
 import { formatMoney } from '@/utils/financeManager'
 
@@ -145,17 +145,6 @@ const initData = () => {
     }, 1500)
     return
   }
-  
-  // 保存到历史记录
-  const historyRecord = {
-    companyName: gameState.value.companyName,
-    startYear: 2000,
-    endYear: gameState.value.currentYear,
-    weeksPlayed: totalWeeks.value,
-    statistics: { ...gameState.value.statistics }
-  }
-  
-  saveGameHistory(historyRecord)
   
   // 设置emoji根据存活时间
   if (totalWeeks.value < 52) {

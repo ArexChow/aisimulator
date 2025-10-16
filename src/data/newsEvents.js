@@ -188,6 +188,13 @@ export function generateProductNews(product) {
   return news
 }
 
+// 生成公司成立新闻（游戏开始）
+export function generateCompanyFoundedNews(companyInfo) {
+  const { name, year, founder, initialFunds } = companyInfo
+  
+  return `🎊 ${year}年，${founder}创立了${name}，初始资金¥${initialFunds.toLocaleString()}，开启创业征程！`
+}
+
 // 生成员工相关新闻
 export function generateEmployeeNews(employee, eventType) {
   switch (eventType) {
