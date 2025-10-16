@@ -521,7 +521,7 @@ const promoteProduct = (product) => {
 const upgradeProduct = (product) => {
   timeManager.value?.pause()
   uni.navigateTo({
-    url: `/pages/quarter-task/quarter-task?productId=${product.instanceId}`
+    url: `/pages/product-upgrade/product-upgrade?productId=${product.instanceId}`
   })
 }
 

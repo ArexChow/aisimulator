@@ -258,24 +258,6 @@ onShow(() => {
   text-align: right;
 }
 
-.crystals-info {
-  margin-top: 30rpx;
-  text-align: center;
-  padding: 20rpx;
-  background: rgba(255, 193, 7, 0.2);
-  border: 3px solid #FFC107;
-}
-
-.crystal-icon {
-  font-size: 32rpx;
-}
-
-.crystal-text {
-  font-size: 32rpx;
-  font-weight: bold;
-  margin-left: 10rpx;
-}
-
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
