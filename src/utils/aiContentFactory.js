@@ -65,6 +65,67 @@ class AIContentFactory {
     }
 
     /**
+     * 生成产品创意（流式版本）
+     */
+    async generateProductIdeasStream(params, onChunk, onComplete, onError) {
+        const prompt = this._buildProductIdeasPrompt(params);
+        let accumulatedContent = '';
+
+        try {
+            await aiService.sendSimpleStreamMessage(
+                prompt,
+                (chunk) => {
+                    accumulatedContent += chunk;
+                    if (onChunk) {
+                        onChunk(chunk, accumulatedContent);
+                    }
+                },
+                (fullContent) => {
+                    // 尝试解析JSON
+                    let result;
+                    try {
+                        result = JSON.parse(fullContent);
+                    } catch (e) {
+                        console.warn('产品创意JSON解析失败:', e);
+                        result = [];
+                    }
+
+                    // 记录历史
+                    this._addToHistory('productIdeas', {
+                        timestamp: Date.now(),
+                        params,
+                        result,
+                        source: 'ai'
+                    });
+
+                    if (onComplete) {
+                        onComplete(result);
+                    }
+                },
+                (error) => {
+                    console.error('产品创意流式生成失败:', error);
+                    
+                    this._addToHistory('productIdeas', {
+                        timestamp: Date.now(),
+                        params,
+                        result: [],
+                        source: 'empty'
+                    });
+
+                    if (onError) {
+                        onError(error);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('产品创意流式生成失败:', error);
+            if (onError) {
+                onError(error);
+            }
+        }
+    }
+
+    /**
      * 生成产品开发日志（现场生成 + 记录历史）
      */
     async generateDevLog(params) {
@@ -98,6 +159,57 @@ class AIContentFactory {
     }
 
     /**
+     * 生成产品开发日志（流式版本）
+     */
+    async generateDevLogStream(params, onChunk, onComplete, onError) {
+        const prompt = this._buildDevLogPrompt(params);
+        let accumulatedContent = '';
+
+        try {
+            await aiService.sendSimpleStreamMessage(
+                prompt,
+                (chunk) => {
+                    accumulatedContent += chunk;
+                    if (onChunk) {
+                        onChunk(chunk, accumulatedContent);
+                    }
+                },
+                (fullContent) => {
+                    this._addToHistory('devLog', {
+                        timestamp: Date.now(),
+                        params,
+                        result: fullContent,
+                        source: 'ai'
+                    });
+
+                    if (onComplete) {
+                        onComplete(fullContent);
+                    }
+                },
+                (error) => {
+                    console.error('开发日志流式生成失败:', error);
+                    
+                    this._addToHistory('devLog', {
+                        timestamp: Date.now(),
+                        params,
+                        result: '',
+                        source: 'empty'
+                    });
+
+                    if (onError) {
+                        onError(error);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('开发日志流式生成失败:', error);
+            if (onError) {
+                onError(error);
+            }
+        }
+    }
+
+    /**
      * 生成员工背景故事（现场生成 + 记录历史）
      */
     async generateEmployeeStory(params) {
@@ -126,6 +238,57 @@ class AIContentFactory {
             });
 
             return '';
+        }
+    }
+
+    /**
+     * 生成员工背景故事（流式版本）
+     */
+    async generateEmployeeStoryStream(params, onChunk, onComplete, onError) {
+        const prompt = this._buildEmployeeStoryPrompt(params);
+        let accumulatedContent = '';
+
+        try {
+            await aiService.sendSimpleStreamMessage(
+                prompt,
+                (chunk) => {
+                    accumulatedContent += chunk;
+                    if (onChunk) {
+                        onChunk(chunk, accumulatedContent);
+                    }
+                },
+                (fullContent) => {
+                    this._addToHistory('employeeStory', {
+                        timestamp: Date.now(),
+                        params,
+                        result: fullContent,
+                        source: 'ai'
+                    });
+
+                    if (onComplete) {
+                        onComplete(fullContent);
+                    }
+                },
+                (error) => {
+                    console.error('员工背景流式生成失败:', error);
+                    
+                    this._addToHistory('employeeStory', {
+                        timestamp: Date.now(),
+                        params,
+                        result: '',
+                        source: 'empty'
+                    });
+
+                    if (onError) {
+                        onError(error);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('员工背景流式生成失败:', error);
+            if (onError) {
+                onError(error);
+            }
         }
     }
 
@@ -170,6 +333,66 @@ class AIContentFactory {
     }
 
     /**
+     * 生成产品用户评论（流式版本）
+     */
+    async generateProductCommentsStream(params, onChunk, onComplete, onError) {
+        const prompt = this._buildProductCommentsPrompt(params);
+        let accumulatedContent = '';
+
+        try {
+            await aiService.sendSimpleStreamMessage(
+                prompt,
+                (chunk) => {
+                    accumulatedContent += chunk;
+                    if (onChunk) {
+                        onChunk(chunk, accumulatedContent);
+                    }
+                },
+                (fullContent) => {
+                    // 尝试解析JSON
+                    let result;
+                    try {
+                        result = JSON.parse(fullContent);
+                    } catch (e) {
+                        console.warn('产品评论JSON解析失败:', e);
+                        result = [];
+                    }
+
+                    this._addToHistory('productComments', {
+                        timestamp: Date.now(),
+                        params,
+                        result,
+                        source: 'ai'
+                    });
+
+                    if (onComplete) {
+                        onComplete(result);
+                    }
+                },
+                (error) => {
+                    console.error('产品评论流式生成失败:', error);
+                    
+                    this._addToHistory('productComments', {
+                        timestamp: Date.now(),
+                        params,
+                        result: [],
+                        source: 'empty'
+                    });
+
+                    if (onError) {
+                        onError(error);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('产品评论流式生成失败:', error);
+            if (onError) {
+                onError(error);
+            }
+        }
+    }
+
+    /**
      * 生成动态新闻事件（现场生成 + 记录历史）
      */
     async generateDynamicNews(params) {
@@ -198,6 +421,57 @@ class AIContentFactory {
             });
 
             return '';
+        }
+    }
+
+    /**
+     * 生成动态新闻事件（流式版本）
+     */
+    async generateDynamicNewsStream(params, onChunk, onComplete, onError) {
+        const prompt = this._buildDynamicNewsPrompt(params);
+        let accumulatedContent = '';
+
+        try {
+            await aiService.sendSimpleStreamMessage(
+                prompt,
+                (chunk) => {
+                    accumulatedContent += chunk;
+                    if (onChunk) {
+                        onChunk(chunk, accumulatedContent);
+                    }
+                },
+                (fullContent) => {
+                    this._addToHistory('dynamicNews', {
+                        timestamp: Date.now(),
+                        params,
+                        result: fullContent,
+                        source: 'ai'
+                    });
+
+                    if (onComplete) {
+                        onComplete(fullContent);
+                    }
+                },
+                (error) => {
+                    console.error('动态新闻流式生成失败:', error);
+                    
+                    this._addToHistory('dynamicNews', {
+                        timestamp: Date.now(),
+                        params,
+                        result: '',
+                        source: 'empty'
+                    });
+
+                    if (onError) {
+                        onError(error);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('动态新闻流式生成失败:', error);
+            if (onError) {
+                onError(error);
+            }
         }
     }
 

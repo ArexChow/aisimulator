@@ -328,9 +328,14 @@ const toggleStory = async (index) => {
   
   // 检查是否已缓存故事
   if (!candidateStories.value[index]) {
-    try {
-      const candidate = candidates.value[index]
-      const story = await aiContentFactory.generateEmployeeStory({
+    const candidate = candidates.value[index]
+    
+    // 初始化为空字符串，准备流式接收
+    candidateStories.value[index] = ''
+    
+    // 使用流式生成
+    aiContentFactory.generateEmployeeStoryStream(
+      {
         name: candidate.name,
         personality: candidate.personality.name,
         programming: candidate.programming,
@@ -340,13 +345,20 @@ const toggleStory = async (index) => {
         channel: selectedChannel.value,
         year: gameState.value.currentYear,
         era: '移动互联网时代'
-      })
-      
-      candidateStories.value[index] = story
-    } catch (error) {
-      console.error('生成背景故事失败:', error)
-      candidateStories.value[index] = '背景故事生成失败，请重试'
-    }
+      },
+      (chunk, accumulated) => {
+        // 实时更新故事内容（打字机效果）
+        candidateStories.value[index] = accumulated
+      },
+      (fullContent) => {
+        // 完成后确保内容完整
+        candidateStories.value[index] = fullContent
+      },
+      (error) => {
+        console.error('生成背景故事失败:', error)
+        candidateStories.value[index] = '背景故事生成失败，请重试'
+      }
+    )
   }
 }
 

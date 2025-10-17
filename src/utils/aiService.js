@@ -382,6 +382,111 @@ class AIService {
         }
     }
 
+    // 发送简单流式消息（一次性调用，无需上下文缓存）- 用于AI增强内容生成的流式版本
+    async sendSimpleStreamMessage(message, onMessageCallback, onCompleteCallback, onErrorCallback) {
+        // #ifdef MP-WEIXIN
+        this.requestStartTime = Date.now();
+        let receivedContent = '';
+
+        try {
+            const requestTask = uni.request({
+                url: `${API_BASE_URL_COMPLETIONS}/responses`,
+                method: 'POST',
+                header: {
+                    'Authorization': `Bearer ${BYTEDANCE_API_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                },
+                data: {
+                    model: getModelId(),
+                    input: message,  // 直接传入消息文本，无需 previous_response_id
+                    stream: true,
+                    thinking: {
+                        type: "disabled"
+                    }
+                },
+                responseType: 'text',
+                enableChunked: true,
+                success: (res) => {
+                    if (res.statusCode === 200) {
+                        console.log('Simple stream request completed successfully.');
+                        // onCompleteCallback 在 onChunkReceived 中已调用
+                    } else {
+                        console.error('Simple stream request failed with status:', res.statusCode, res.data);
+                        if (onErrorCallback) {
+                            onErrorCallback(new Error(`Stream request failed with status: ${res.statusCode}`));
+                        }
+                    }
+                },
+                fail: (err) => {
+                    console.error('Simple stream request failed:', err);
+                    if (onErrorCallback) {
+                        onErrorCallback(err);
+                    }
+                }
+            });
+
+            requestTask.onHeadersReceived((res) => {
+                console.log('Simple stream headers received:', res.header);
+            });
+
+            requestTask.onChunkReceived((res) => {
+                const chunk = new TextDecoderLite('utf-8').decode(new Uint8Array(res.data));
+
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        const data = line.substring(5).trim();
+                        if (data === '[DONE]') {
+                            console.log('Simple stream finished.');
+                            requestTask.abort();
+                            return;
+                        }
+                        try {
+                            const json = JSON.parse(data);
+                            if (json.type === 'response.output_text.delta') {
+                                const content = json.delta;
+                                if (content !== undefined && content !== "undefined") {
+                                    receivedContent += content;
+                                    if (onMessageCallback) {
+                                        onMessageCallback(content);
+                                    }
+                                }
+                            } else if (json.type === 'response.completed') {
+                                const fullContent = json?.response?.output?.[0]?.content?.[0]?.text;
+                                console.log("Simple stream completed, usage:", json.response?.usage);
+                                if (onCompleteCallback) {
+                                    onCompleteCallback(fullContent || receivedContent);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse JSON from simple stream chunk:', data, e);
+                        }
+                    }
+                }
+            });
+
+            return requestTask;
+
+        } catch (error) {
+            console.error('发送简单流式消息失败:', error);
+            const duration = Date.now() - this.requestStartTime;
+            console.log(`请求失败耗时: ${duration}ms`);
+            if (onErrorCallback) {
+                onErrorCallback(error);
+            }
+            throw error;
+        }
+        // #endif
+
+        // #ifdef APP
+        console.log("sendSimpleStreamMessage not implemented for APP platform");
+        if (onErrorCallback) {
+            onErrorCallback(new Error('Stream not supported on APP platform'));
+        }
+        // #endif
+    }
+
     // 获取当前请求开始时间
     getRequestStartTime() {
         return this.requestStartTime;

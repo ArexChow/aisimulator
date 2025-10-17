@@ -286,7 +286,7 @@ import { loadGameState, saveGameState, addNews, updateProduct, updateEmployee, r
 import { TimeManager, formatTime, getCurrentEra } from '@/utils/timeSystem'
 import { updateEmployeeWeekly, getEmployeeStatusText, pepTalk as doPepTalk, walkBy as doWalkBy, fireEmployee, calculateMonthlySalaries } from '@/utils/employeeManager'
 import { settleWeeklyFinance, checkBankruptcy, getMoneyStatus, formatMoney, requestFinancing, FINANCING_CONFIG } from '@/utils/financeManager'
-import { updateProductWeekly, applyUpgrade, applyPromotion, PROMOTION_METHODS } from '@/data/growthRules'
+import { updateProductWeekly, applyUpgrade, applyPromotion, PROMOTION_METHODS, calculateOperatingCost } from '@/data/growthRules'
 import { getThemeByYear, getThemeChangeMessage } from '@/utils/themeSystem'
 import { generateRandomNews, checkMilestoneEvent, generateProductNews } from '@/data/newsEvents'
 import { getSolution, calculateInitialDAU, calculateInitialRating } from '@/data/solutions'
@@ -347,6 +347,8 @@ const initGame = () => {
   
   // 注册每周事件
   timeManager.value.on('onWeekPass', handleWeekPass)
+  // 注册每月财务结算事件
+  timeManager.value.on('onMonthPass', handleMonthPass)
   
   // 初始化主题
   const currentEra = getCurrentEra(gameState.value.currentYear)
@@ -413,35 +415,7 @@ const handleWeekPass = async (timeData) => {
     }
   })
   
-  // 3. 更新融资冷却
-  updateFinancingCooldown(gameState.value)
-  
-  // 4. 财务结算
-  const financeResult = settleWeeklyFinance(
-    gameState.value.money,
-    gameState.value.products,
-    gameState.value.employees
-  )
-  
-  gameState.value.money = financeResult.newMoney
-  gameState.value.statistics.totalRevenue += Math.max(0, financeResult.income)
-  gameState.value.statistics.totalExpenses += Math.max(0, financeResult.expenses)
-  
-  // 添加财务新闻
-  if (financeResult.netChange !== 0) {
-    const sign = financeResult.profit ? '+' : ''
-    addNews(gameState.value, {
-      content: `本周财务：收入¥${formatMoney(financeResult.income)}，支出¥${formatMoney(financeResult.expenses)}，${sign}¥${formatMoney(financeResult.netChange)}`
-    })
-  }
-  
-  // 5. 检查破产
-  if (checkBankruptcy(gameState.value.money, financeResult.expenses)) {
-    handleBankruptcy()
-    return
-  }
-  
-  // 6. 检查时代切换
+  // 3. 检查时代切换
   const currentEra = getCurrentEra(gameState.value.currentYear)
   if (lastEra.value !== currentEra) {
     const newTheme = getThemeByYear(gameState.value.currentYear)
@@ -455,59 +429,122 @@ const handleWeekPass = async (timeData) => {
     }
   }
   
-  // 7. 生成随机新闻（每4周一次）
-  if (gameState.value.currentWeek % 4 === 0) {
-    // 检查里程碑事件
-    const milestone = checkMilestoneEvent(gameState.value.currentYear)
-    if (milestone) {
-      addNews(gameState.value, { content: milestone })
+  // 4. 保存游戏状态
+  saveGameState(gameState.value)
+  
+  // 5. 更新未读新闻计数
+  updateUnreadNewsCount()
+}
+
+const handleMonthPass = async (timeData) => {
+  if (!gameState.value) return
+  
+  gameState.value.currentYear = timeData.year
+  gameState.value.currentWeek = timeData.week
+  
+  // 每月结算财务 - 计算整个月（4周）的收入和支出
+  let monthlyIncome = 0
+  let monthlyExpenses = 0
+  
+  // 计算本月收入（4周）
+  gameState.value.products.forEach(product => {
+    if (product.status === 'operating') {
+      // 月收入
+      monthlyIncome += product.monthlyRevenue
     }
-    
-    // 生成随机市场新闻（80%AI生成，20%预设）
-    const useAI = Math.random() < 0.8
-    let newsContent = ''
-    
-    if (useAI) {
-      try {
-        newsContent = await aiContentFactory.generateDynamicNews({
-          year: gameState.value.currentYear,
-          era: currentEra,
-          companyName: gameState.value.companyName,
-          employeeCount: gameState.value.employees.length,
-          productCount: gameState.value.products.length,
-          mainProducts: gameState.value.products.slice(0, 3).map(p => ({
-            name: p.name,
-            category: p.category,
-            dau: p.dau
-          })),
-          marketPosition: gameState.value.products.length > 0 ? '成长' : '新创'
-        })
-      } catch (error) {
-        console.error('AI新闻生成失败，使用预设:', error)
-        newsContent = generateRandomNews(gameState.value.currentYear, currentEra)
-      }
-    } else {
-      newsContent = generateRandomNews(gameState.value.currentYear, currentEra)
+  })
+  
+  // 计算本月支出（员工工资 + 产品运营成本）
+  monthlyExpenses += calculateMonthlySalaries(gameState.value.employees)
+  gameState.value.products.forEach(product => {
+    if (product.status === 'operating') {
+      const monthlyCost = calculateOperatingCost(product)
+      monthlyExpenses += monthlyCost
     }
-    
-    addNews(gameState.value, { content: newsContent })
-    
-    // 检查产品里程碑
-    gameState.value.products.forEach(product => {
-      if (product.status === 'operating') {
-        const productNews = generateProductNews(product)
-        productNews.forEach(news => {
-          addNews(gameState.value, { content: news })
-        })
-      }
+  })
+  
+  const monthlyNetChange = monthlyIncome - monthlyExpenses
+  gameState.value.money += monthlyNetChange
+  gameState.value.statistics.totalRevenue += Math.max(0, monthlyIncome)
+  gameState.value.statistics.totalExpenses += Math.max(0, monthlyExpenses)
+  
+  // 添加月度财务新闻
+  if (monthlyNetChange !== 0) {
+    const sign = monthlyNetChange > 0 ? '+' : ''
+    addNews(gameState.value, {
+      content: `本月财务：收入¥${formatMoney(monthlyIncome)}，支出¥${formatMoney(monthlyExpenses)}，${sign}¥${formatMoney(monthlyNetChange)}`
     })
   }
   
-  // 8. 保存游戏状态
-  saveGameState(gameState.value)
+  // 每月检查破产
+  if (checkBankruptcy(gameState.value.money, monthlyExpenses)) {
+    handleBankruptcy()
+    return
+  }
   
-  // 9. 更新未读新闻计数
-  updateUnreadNewsCount()
+  // 每月检查融资冷却
+  updateFinancingCooldown(gameState.value)
+  
+  // 每月生成随机新闻
+  // 检查里程碑事件
+  const milestone = checkMilestoneEvent(gameState.value.currentYear)
+  if (milestone) {
+    addNews(gameState.value, { content: milestone })
+  }
+  
+  // 生成随机市场新闻（80%AI生成，20%预设）
+  const useAI = Math.random() < 0.8
+  
+  if (useAI) {
+    // 使用流式生成动态新闻
+    aiContentFactory.generateDynamicNewsStream(
+      {
+        year: gameState.value.currentYear,
+        era: getCurrentEra(gameState.value.currentYear),
+        companyName: gameState.value.companyName,
+        employeeCount: gameState.value.employees.length,
+        productCount: gameState.value.products.length,
+        mainProducts: gameState.value.products.slice(0, 3).map(p => ({
+          name: p.name,
+          category: p.category,
+          dau: p.dau
+        })),
+        marketPosition: gameState.value.products.length > 0 ? '成长' : '新创'
+      },
+      (chunk, accumulated) => {
+        // 流式更新时不做特殊处理（后台生成）
+        // console.log('动态新闻生成中:', accumulated)
+      },
+      (fullContent) => {
+        // 完成后添加到新闻列表
+        if (fullContent) {
+          addNews(gameState.value, { content: fullContent })
+          saveGameState(gameState.value)
+        }
+      },
+      (error) => {
+        console.error('AI新闻生成失败，使用预设:', error)
+        const newsContent = generateRandomNews(gameState.value.currentYear, getCurrentEra(gameState.value.currentYear))
+        addNews(gameState.value, { content: newsContent })
+        saveGameState(gameState.value)
+      }
+    )
+  } else {
+    const newsContent = generateRandomNews(gameState.value.currentYear, getCurrentEra(gameState.value.currentYear))
+    addNews(gameState.value, { content: newsContent })
+  }
+  
+  // 检查产品里程碑
+  gameState.value.products.forEach(product => {
+    if (product.status === 'operating') {
+      const productNews = generateProductNews(product)
+      productNews.forEach(news => {
+        addNews(gameState.value, { content: news })
+      })
+    }
+  })
+  
+  saveGameState(gameState.value)
 }
 
 const launchProduct = (product) => {
@@ -701,8 +738,16 @@ const showDevLogs = async (product) => {
   
   // 检查是否已缓存
   if (!productDevLogs.value[product.instanceId]) {
-    try {
-      const log = await aiContentFactory.generateDevLog({
+    // 初始化日志数组和空条目
+    productDevLogs.value[product.instanceId] = [{
+      week: gameState.value.currentWeek,
+      content: '',
+      streaming: true
+    }]
+    
+    // 使用流式生成日志
+    aiContentFactory.generateDevLogStream(
+      {
         productName: product.name,
         category: product.category,
         grade: product.grade,
@@ -718,16 +763,28 @@ const showDevLogs = async (product) => {
         totalWeeks: 8,
         isDelayed: false,
         logType: 'task_progress'
-      })
-      
-      productDevLogs.value[product.instanceId] = productDevLogs.value[product.instanceId] || []
-      productDevLogs.value[product.instanceId].push({
-        week: gameState.value.currentWeek,
-        content: log
-      })
-    } catch (error) {
-      console.error('生成开发日志失败:', error)
-    }
+      },
+      (chunk, accumulated) => {
+        // 实时更新日志内容（打字机效果）
+        if (productDevLogs.value[product.instanceId] && productDevLogs.value[product.instanceId][0]) {
+          productDevLogs.value[product.instanceId][0].content = accumulated
+        }
+      },
+      (fullContent) => {
+        // 完成后标记为非流式
+        if (productDevLogs.value[product.instanceId] && productDevLogs.value[product.instanceId][0]) {
+          productDevLogs.value[product.instanceId][0].content = fullContent
+          productDevLogs.value[product.instanceId][0].streaming = false
+        }
+      },
+      (error) => {
+        console.error('生成开发日志失败:', error)
+        if (productDevLogs.value[product.instanceId] && productDevLogs.value[product.instanceId][0]) {
+          productDevLogs.value[product.instanceId][0].content = '日志生成失败'
+          productDevLogs.value[product.instanceId][0].streaming = false
+        }
+      }
+    )
   }
 }
 
@@ -744,8 +801,12 @@ const showComments = async (product) => {
   
   // 检查是否已缓存
   if (!productComments.value[product.instanceId]) {
-    try {
-      const comments = await aiContentFactory.generateProductComments({
+    // 初始化为空数组，标记为生成中
+    productComments.value[product.instanceId] = []
+    
+    // 使用流式生成评论
+    aiContentFactory.generateProductCommentsStream(
+      {
         productName: product.name,
         category: product.category,
         grade: product.grade,
@@ -756,12 +817,20 @@ const showComments = async (product) => {
         trend: 'stable',
         revenue: product.monthlyRevenue,
         scenario: 'steady_operation'
-      })
-      
-      productComments.value[product.instanceId] = comments
-    } catch (error) {
-      console.error('生成用户评论失败:', error)
-    }
+      },
+      (chunk, accumulated) => {
+        // 流式生成时显示提示（JSON文本不适合直接展示）
+        // console.log('评论生成中:', accumulated)
+      },
+      (parsedComments) => {
+        // 完成后更新评论列表
+        productComments.value[product.instanceId] = parsedComments || []
+      },
+      (error) => {
+        console.error('生成用户评论失败:', error)
+        productComments.value[product.instanceId] = []
+      }
+    )
   }
 }
 

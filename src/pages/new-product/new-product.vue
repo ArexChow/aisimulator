@@ -57,6 +57,12 @@
           {{ generatingIdeas ? '生成中...' : '💡 获取创意' }}
         </view>
         
+        <!-- 流式生成的JSON文本展示 -->
+        <view v-if="streamingIdeasText" class="streaming-text-container mt-20">
+          <view class="pixel-subtitle text-center">正在生成创意...</view>
+          <view class="streaming-text pixel-card">{{ streamingIdeasText }}</view>
+        </view>
+        
         <!-- 显示AI生成的创意 -->
         <view v-if="productIdeas.length > 0" class="ideas-container mt-20">
           <view class="pixel-subtitle text-center">AI生成的创意</view>
@@ -243,6 +249,7 @@ const selectedEmployees = ref([])
 // AI创意生成状态
 const generatingIdeas = ref(false)
 const productIdeas = ref([])
+const streamingIdeasText = ref('') // 流式生成的JSON文本
 
 // 可用选项
 const availableCategories = ref([])
@@ -423,8 +430,12 @@ const goBack = () => {
 const getProductIdeas = async () => {
   if (generatingIdeas.value) return
   generatingIdeas.value = true
-  try {
-    const ideas = await aiContentFactory.generateProductIdeas({
+  streamingIdeasText.value = '' // 清空之前的流式文本
+  productIdeas.value = [] // 清空之前的创意
+  
+  // 使用流式生成
+  aiContentFactory.generateProductIdeasStream(
+    {
       year: gameState.value.currentYear,
       era: gameState.value.era,
       companyName: gameState.value.companyName,
@@ -436,21 +447,39 @@ const getProductIdeas = async () => {
       trendingTopics: ['产品创新', '用户体验'],
       competitors: [],
       userPainPoints: []
-    })
-    productIdeas.value = ideas
-    uni.showToast({
-      title: '已生成3个创意方案',
-      icon: 'success'
-    })
-  } catch (error) {
-    console.error('获取创意失败:', error)
-    uni.showToast({
-      title: '获取创意失败，使用预设方案',
-      icon: 'none'
-    })
-  } finally {
-    generatingIdeas.value = false
-  }
+    },
+    (chunk, accumulated) => {
+      // 实时更新流式文本（打字机效果）
+      streamingIdeasText.value = accumulated
+    },
+    (parsedIdeas) => {
+      // 完成后展示解析后的创意卡片
+      productIdeas.value = parsedIdeas
+      streamingIdeasText.value = '' // 清空流式文本
+      generatingIdeas.value = false
+      
+      if (parsedIdeas && parsedIdeas.length > 0) {
+        uni.showToast({
+          title: `已生成${parsedIdeas.length}个创意方案`,
+          icon: 'success'
+        })
+      } else {
+        uni.showToast({
+          title: '创意生成完成',
+          icon: 'none'
+        })
+      }
+    },
+    (error) => {
+      console.error('获取创意失败:', error)
+      streamingIdeasText.value = ''
+      generatingIdeas.value = false
+      uni.showToast({
+        title: '获取创意失败，请重试',
+        icon: 'none'
+      })
+    }
+  )
 }
 
 const useProductIdea = (idea) => {
@@ -588,6 +617,25 @@ onLoad(() => {
 
 .ai-ideas-section {
   margin-top: 30rpx;
+}
+
+.streaming-text-container {
+  margin-top: 20rpx;
+}
+
+.streaming-text {
+  padding: 20rpx;
+  background: #FFF;
+  border: 3px solid #3E2723;
+  min-height: 200rpx;
+  max-height: 400rpx;
+  overflow-y: auto;
+  font-size: 22rpx;
+  color: #5D4037;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
 }
 
 .ideas-container {
