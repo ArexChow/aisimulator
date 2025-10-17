@@ -21,6 +21,14 @@ export function getEmployeeStatusText(employee, products) {
     return '工作中';
   }
   
+  if (employee.status === EMPLOYEE_STATUS.IDLE) {
+    // 如果体力未满，显示正在恢复
+    if (employee.stamina < employee.maxStamina) {
+      return '休息中 💤 (体力恢复+25/周)';
+    }
+    return '空闲中';
+  }
+  
   return '空闲中';
 }
 
@@ -36,7 +44,13 @@ export function updateEmployeeWeekly(employee, currentWeek) {
       staminaCost = Math.round(staminaCost * employee.personality.effect.value);
     }
     
+    const oldStamina = employee.stamina;
     employee.stamina = Math.max(0, employee.stamina - staminaCost);
+    
+    // 体力变化日志（仅在体力较低时显示）
+    if (employee.stamina <= 30) {
+      console.log(`[体力消耗] ${employee.name}: ${oldStamina} -> ${employee.stamina} (消耗${staminaCost})`);
+    }
     
     // 检查是否进入摸鱼状态
     if (employee.stamina <= 20) {
@@ -46,11 +60,28 @@ export function updateEmployeeWeekly(employee, currentWeek) {
   
   // 如果在摸鱼，恢复体力
   if (employee.status === EMPLOYEE_STATUS.SLACKING) {
+    const oldStamina = employee.stamina;
     employee.stamina = Math.min(employee.maxStamina, employee.stamina + 15);
+    
+    if (employee.stamina < employee.maxStamina) {
+      console.log(`[体力恢复-摸鱼] ${employee.name}: ${oldStamina} -> ${employee.stamina} (+15)`);
+    }
     
     // 体力恢复到100后自动恢复工作
     if (employee.stamina >= employee.maxStamina) {
       employee.status = EMPLOYEE_STATUS.WORKING;
+      console.log(`[状态恢复] ${employee.name} 体力恢复满，重新开始工作`);
+    }
+  }
+  
+  // 如果空闲，快速恢复体力
+  if (employee.status === EMPLOYEE_STATUS.IDLE) {
+    const oldStamina = employee.stamina;
+    const staminaRecover = 25; // 空闲状态每周恢复25点，比摸鱼快
+    employee.stamina = Math.min(employee.maxStamina, employee.stamina + staminaRecover);
+    
+    if (oldStamina < employee.maxStamina && employee.stamina !== oldStamina) {
+      console.log(`[体力恢复-空闲] ${employee.name}: ${oldStamina} -> ${employee.stamina} (+${staminaRecover})`);
     }
   }
   
@@ -69,9 +100,15 @@ function checkSlackingCondition(employee) {
     slackProbability *= employee.personality.effect.value;
   }
   
+  const randomValue = Math.random();
+  console.log(`[摸鱼检查] ${employee.name} - 体力:${employee.stamina}, 概率:${(slackProbability * 100).toFixed(1)}%, 随机值:${(randomValue * 100).toFixed(1)}%`);
+  
   // 随机判断是否摸鱼
-  if (Math.random() < slackProbability) {
+  if (randomValue < slackProbability) {
     employee.status = EMPLOYEE_STATUS.SLACKING;
+    console.log(`[摸鱼触发] ${employee.name} 开始摸鱼！`);
+  } else {
+    console.log(`[摸鱼检查] ${employee.name} 顶住了，继续工作`);
   }
 }
 

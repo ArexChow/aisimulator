@@ -86,9 +86,46 @@
                 </view>
                 <text class="progress-text">{{ product.developmentProgress }}%</text>
               </view>
-              <view class="current-todo" v-if="product.developmentTodos[product.currentTodoIndex]">
-                ✓ {{ product.developmentTodos[product.currentTodoIndex] }}
+            </view>
+            
+            <!-- 研发日志滚动区（研发中和运营中都显示） -->
+            <view v-if="product.status === 'developing' || product.status === 'operating'" class="product-development-logs">
+              <view class="dev-logs-header">
+                <text>📋 研发日志</text>
+                <text class="dev-logs-hint">最新 ↓</text>
               </view>
+              <scroll-view 
+                scroll-y 
+                class="dev-logs-scroll"
+              >
+                <view class="dev-logs-container">
+                  <view 
+                    v-for="(logItem, index) in getReversedLogs(product.instanceId)" 
+                    :key="index"
+                    class="dev-log-item"
+                    :class="{
+                      'dev-log-todo': logItem.type === 'todo', 
+                      'dev-log-ai': logItem.type === 'log',
+                      'dev-log-slack': logItem.type === 'slack'
+                    }"
+                  >
+                    <view class="dev-log-header">
+                      <text class="dev-log-time">{{ formatNewsTime(logItem.week) }}</text>
+                      <text class="dev-log-type" v-if="logItem.type === 'todo'">✓ 任务</text>
+                      <text class="dev-log-type" v-else-if="logItem.type === 'slack'">⚠️ 摸鱼</text>
+                      <text class="dev-log-type" v-else>📝 日志</text>
+                    </view>
+                    <view class="dev-log-content">
+                      {{ logItem.content }}
+                      <text v-if="logItem.streaming" class="streaming-cursor">▊</text>
+                    </view>
+                  </view>
+                  
+                  <view v-if="!developmentLogs[product.instanceId] || developmentLogs[product.instanceId].length === 0" class="dev-logs-empty">
+                    研发进行中，日志加载中...
+                  </view>
+                </view>
+              </scroll-view>
             </view>
             
             <!-- 运营中 -->
@@ -111,25 +148,8 @@
             <view class="product-actions" v-if="product.status === 'operating'">
               <view class="pixel-btn-tiny" @click="promoteProduct(product)">推广</view>
               <view class="pixel-btn-tiny" @click="upgradeProduct(product)">升级</view>
-              <view class="pixel-btn-tiny" @click="showDevLogs(product)">📋日志</view>
               <view class="pixel-btn-tiny" @click="showComments(product)">💬评论</view>
               <view class="pixel-btn-tiny pixel-btn-danger" @click="offlineProduct(product)">下架</view>
-            </view>
-            
-            <!-- 开发日志展开区 -->
-            <view v-if="selectedProductLogs === product.instanceId" class="product-details">
-              <view class="details-header">开发日志</view>
-              <view v-if="productDevLogs[product.instanceId]?.length > 0" class="logs-list">
-                <view 
-                  v-for="(log, index) in productDevLogs[product.instanceId]"
-                  :key="index"
-                  class="log-item"
-                >
-                  <view class="log-time">第{{ log.week }}周</view>
-                  <view class="log-content">{{ log.content }}</view>
-                </view>
-              </view>
-              <view v-else class="loading-hint">加载中...</view>
             </view>
             
             <!-- 用户评论展开区 -->
@@ -169,11 +189,17 @@
             v-for="employee in gameState.employees" 
             :key="employee.id"
             class="employee-card pixel-card"
+            :class="{ 
+              'employee-slacking': employee.status === 'slacking',
+              'employee-resting': employee.status === 'idle' && employee.stamina < employee.maxStamina
+            }"
           >
             <view class="employee-header">
               <view class="employee-name-row">
                 <text class="employee-name">{{ employee.name }}</text>
                 <view class="personality-tag">{{ employee.personality.name }}</view>
+                <view v-if="employee.status === 'slacking'" class="slacking-badge">摸鱼中</view>
+                <view v-if="employee.status === 'idle' && employee.stamina < employee.maxStamina" class="resting-badge">休息中</view>
               </view>
               <view class="employee-status">{{ getEmployeeStatus(employee) }}</view>
             </view>
@@ -211,12 +237,14 @@
                   :style="{width: (employee.stamina / employee.maxStamina * 100) + '%'}"
                 ></view>
               </view>
-              <text class="stamina-value">{{ employee.stamina }}</text>
+              <text class="stamina-value" :class="{ 'stamina-critical': employee.stamina <= 20 }">
+                {{ employee.stamina }}/{{ employee.maxStamina }}
+              </text>
             </view>
             
             <view class="employee-actions">
               <view class="pixel-btn-tiny" @click="pepTalk(employee)">画大饼</view>
-              <view class="pixel-btn-tiny" v-if="employee.status === 'slacking'" @click="walkBy(employee)">路过</view>
+              <view class="pixel-btn-tiny" v-if="employee.status === 'slacking'" @click="walkBy(employee)">路过工位</view>
               <view class="pixel-btn-tiny pixel-btn-danger" @click="confirmFire(employee)">解雇</view>
             </view>
           </view>
@@ -235,7 +263,7 @@
             :key="newsItem.id"
             class="news-item"
           >
-            <view class="news-time">第{{ newsItem.week }}周</view>
+            <view class="news-time">{{ formatNewsTime(newsItem.week) }}</view>
             <view class="news-content">{{ newsItem.content }}</view>
           </view>
           
@@ -283,12 +311,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onLoad, onShow, onHide } from '@dcloudio/uni-app'
 import { loadGameState, saveGameState, addNews, updateProduct, updateEmployee, removeProduct, removeEmployee, updateFinancingCooldown, addFinancing } from '@/utils/storage'
-import { TimeManager, formatTime, getCurrentEra } from '@/utils/timeSystem'
+import { TimeManager, formatTime, getCurrentEra, formatYearMonth } from '@/utils/timeSystem'
 import { updateEmployeeWeekly, getEmployeeStatusText, pepTalk as doPepTalk, walkBy as doWalkBy, fireEmployee, calculateMonthlySalaries } from '@/utils/employeeManager'
 import { settleWeeklyFinance, checkBankruptcy, getMoneyStatus, formatMoney, requestFinancing, FINANCING_CONFIG } from '@/utils/financeManager'
 import { updateProductWeekly, applyUpgrade, applyPromotion, PROMOTION_METHODS, calculateOperatingCost } from '@/data/growthRules'
 import { getThemeByYear, getThemeChangeMessage } from '@/utils/themeSystem'
-import { generateRandomNews, checkMilestoneEvent, generateProductNews } from '@/data/newsEvents'
+import { checkMilestoneEvent, generateProductNews } from '@/data/newsEvents'
 import { getSolution, calculateInitialDAU, calculateInitialRating } from '@/data/solutions'
 import { aiContentFactory } from '@/utils/aiContentFactory'
 
@@ -303,10 +331,10 @@ const unreadNewsCount = ref(0)
 const lastReadNewsId = ref(0)
 const selectedProductFilter = ref(null)
 // AI内容状态
-const selectedProductLogs = ref(null)
 const selectedProductComments = ref(null)
-const productDevLogs = ref({})
 const productComments = ref({})
+// 研发进度日志（每周）
+const developmentLogs = ref({}) // 格式：{ productId: [{ week: 1, type: 'todo'|'log', content: 'xxx', streaming: false }] }
 
 // 计算属性
 const timeDisplay = computed(() => {
@@ -324,6 +352,13 @@ const filteredProducts = computed(() => {
   if (!selectedProductFilter.value) return gameState.value.products
   return gameState.value.products.filter(p => p.instanceId === selectedProductFilter.value)
 })
+
+// 获取反转后的日志列表（最新的在最上面）
+const getReversedLogs = (productId) => {
+  const logs = developmentLogs.value[productId]
+  if (!logs || logs.length === 0) return []
+  return [...logs].reverse()
+}
 
 // 方法
 const initGame = () => {
@@ -372,9 +407,18 @@ const handleWeekPass = async (timeData) => {
   gameState.value.currentWeek = timeData.week
   
   // 1. 更新所有员工状态
-  gameState.value.employees = gameState.value.employees.map(emp => 
-    updateEmployeeWeekly(emp, gameState.value.currentWeek)
-  )
+  gameState.value.employees = gameState.value.employees.map(emp => {
+    const oldStatus = emp.status
+    const oldStamina = emp.stamina
+    const updated = updateEmployeeWeekly(emp, gameState.value.currentWeek)
+    
+    // 调试日志：记录状态变化
+    if (oldStatus !== updated.status) {
+      console.log(`[员工状态变化] ${updated.name}: ${oldStatus} -> ${updated.status}, 体力: ${oldStamina} -> ${updated.stamina}`)
+    }
+    
+    return updated
+  })
   
   // 2. 更新所有产品
   gameState.value.products.forEach(product => {
@@ -387,6 +431,21 @@ const handleWeekPass = async (timeData) => {
         e.workingOn === product.instanceId && e.status === 'working'
       )
       
+      const slackingEmployees = gameState.value.employees.filter(e => 
+        e.workingOn === product.instanceId && e.status === 'slacking'
+      )
+      
+      // 如果有员工摸鱼，添加摸鱼日志
+      if (slackingEmployees.length > 0) {
+        const slackingNames = slackingEmployees.map(e => e.name).join('、')
+        addDevelopmentLog(product.instanceId, {
+          week: gameState.value.currentWeek,
+          type: 'slack',
+          content: `⚠️ ${slackingNames} 正在摸鱼，开发进度受到影响...`,
+          streaming: false
+        })
+      }
+      
       if (workingEmployees.length > 0) {
         // 推进开发进度
         const todosPerWeek = 100 / product.developmentTodos.length
@@ -396,10 +455,22 @@ const handleWeekPass = async (timeData) => {
         const newTodoIndex = Math.floor(product.developmentProgress / todosPerWeek)
         if (newTodoIndex > product.currentTodoIndex && newTodoIndex < product.developmentTodos.length) {
           product.currentTodoIndex = newTodoIndex
+          
+          // 添加 todo 到研发日志
+          addDevelopmentLog(product.instanceId, {
+            week: gameState.value.currentWeek,
+            type: 'todo',
+            content: product.developmentTodos[newTodoIndex - 1],
+            streaming: false
+          })
+          
           addNews(gameState.value, {
             content: `${product.name} 完成了"${product.developmentTodos[newTodoIndex - 1]}"`
           })
         }
+        
+        // 每周生成研发日志
+        generateWeeklyDevLog(product)
         
         // 检查是否完成开发
         if (product.developmentProgress >= 100) {
@@ -492,47 +563,39 @@ const handleMonthPass = async (timeData) => {
     addNews(gameState.value, { content: milestone })
   }
   
-  // 生成随机市场新闻（80%AI生成，20%预设）
-  const useAI = Math.random() < 0.8
-  
-  if (useAI) {
-    // 使用流式生成动态新闻
-    aiContentFactory.generateDynamicNewsStream(
-      {
-        year: gameState.value.currentYear,
-        era: getCurrentEra(gameState.value.currentYear),
-        companyName: gameState.value.companyName,
-        employeeCount: gameState.value.employees.length,
-        productCount: gameState.value.products.length,
-        mainProducts: gameState.value.products.slice(0, 3).map(p => ({
-          name: p.name,
-          category: p.category,
-          dau: p.dau
-        })),
-        marketPosition: gameState.value.products.length > 0 ? '成长' : '新创'
-      },
-      (chunk, accumulated) => {
-        // 流式更新时不做特殊处理（后台生成）
-        // console.log('动态新闻生成中:', accumulated)
-      },
-      (fullContent) => {
-        // 完成后添加到新闻列表
-        if (fullContent) {
-          addNews(gameState.value, { content: fullContent })
-          saveGameState(gameState.value)
-        }
-      },
-      (error) => {
-        console.error('AI新闻生成失败，使用预设:', error)
-        const newsContent = generateRandomNews(gameState.value.currentYear, getCurrentEra(gameState.value.currentYear))
-        addNews(gameState.value, { content: newsContent })
+  // 使用AI生成动态新闻（100% AI生成）
+  aiContentFactory.generateDynamicNewsStream(
+    {
+      year: gameState.value.currentYear,
+      era: getCurrentEra(gameState.value.currentYear),
+      companyName: gameState.value.companyName,
+      employeeCount: gameState.value.employees.length,
+      productCount: gameState.value.products.length,
+      mainProducts: gameState.value.products.slice(0, 3).map(p => ({
+        name: p.name,
+        category: p.category,
+        dau: p.dau
+      })),
+      marketPosition: gameState.value.products.length > 0 ? '成长' : '新创'
+    },
+    (chunk, accumulated) => {
+      // 流式更新时不做特殊处理（后台生成）
+      // console.log('动态新闻生成中:', accumulated)
+    },
+    (fullContent) => {
+      // 完成后添加到新闻列表
+      if (fullContent) {
+        addNews(gameState.value, { content: fullContent })
         saveGameState(gameState.value)
       }
-    )
-  } else {
-    const newsContent = generateRandomNews(gameState.value.currentYear, getCurrentEra(gameState.value.currentYear))
-    addNews(gameState.value, { content: newsContent })
-  }
+    },
+    (error) => {
+      console.error('AI新闻生成失败:', error)
+      // AI生成失败时添加简单提示，不使用预设新闻
+      addNews(gameState.value, { content: '📰 行业资讯生成中，请稍候...' })
+      saveGameState(gameState.value)
+    }
+  )
   
   // 检查产品里程碑
   gameState.value.products.forEach(product => {
@@ -632,6 +695,14 @@ const formatNumber = (num) => {
   return num.toFixed(0)
 }
 
+const formatNewsTime = (week) => {
+  // 根据周数计算年份和月份
+  const year = Math.floor((week - 1) / 52) + 2000
+  const weekOfYear = ((week - 1) % 52) + 1
+  const month = Math.ceil(weekOfYear / 4)
+  return `${year}年${month}月`
+}
+
 const goToNewProduct = () => {
   timeManager.value?.pause()
   uni.navigateTo({
@@ -723,69 +794,6 @@ const offlineProduct = (product) => {
       }
     }
   })
-}
-
-// AI生成的开发日志
-const showDevLogs = async (product) => {
-  if (selectedProductLogs.value === product.instanceId) {
-    // 切换关闭
-    selectedProductLogs.value = null
-    return
-  }
-  
-  selectedProductLogs.value = product.instanceId
-  selectedProductComments.value = null // 关闭评论
-  
-  // 检查是否已缓存
-  if (!productDevLogs.value[product.instanceId]) {
-    // 初始化日志数组和空条目
-    productDevLogs.value[product.instanceId] = [{
-      week: gameState.value.currentWeek,
-      content: '',
-      streaming: true
-    }]
-    
-    // 使用流式生成日志
-    aiContentFactory.generateDevLogStream(
-      {
-        productName: product.name,
-        category: product.category,
-        grade: product.grade,
-        solution: product.solution,
-        employees: gameState.value.employees.filter(e => e.workingOn === product.instanceId),
-        avgProgramming: 70,
-        avgArt: 60,
-        avgBusiness: 50,
-        teamStatus: '正常',
-        currentTask: product.developmentTodos?.[product.currentTodoIndex] || '开发中',
-        progress: product.developmentProgress,
-        week: gameState.value.currentWeek,
-        totalWeeks: 8,
-        isDelayed: false,
-        logType: 'task_progress'
-      },
-      (chunk, accumulated) => {
-        // 实时更新日志内容（打字机效果）
-        if (productDevLogs.value[product.instanceId] && productDevLogs.value[product.instanceId][0]) {
-          productDevLogs.value[product.instanceId][0].content = accumulated
-        }
-      },
-      (fullContent) => {
-        // 完成后标记为非流式
-        if (productDevLogs.value[product.instanceId] && productDevLogs.value[product.instanceId][0]) {
-          productDevLogs.value[product.instanceId][0].content = fullContent
-          productDevLogs.value[product.instanceId][0].streaming = false
-        }
-      },
-      (error) => {
-        console.error('生成开发日志失败:', error)
-        if (productDevLogs.value[product.instanceId] && productDevLogs.value[product.instanceId][0]) {
-          productDevLogs.value[product.instanceId][0].content = '日志生成失败'
-          productDevLogs.value[product.instanceId][0].streaming = false
-        }
-      }
-    )
-  }
 }
 
 // AI生成的用户评论
@@ -983,9 +991,111 @@ const updateUnreadNewsCount = () => {
   }
 }
 
+// 添加研发日志条目
+const addDevelopmentLog = (productId, logItem) => {
+  if (!developmentLogs.value[productId]) {
+    developmentLogs.value[productId] = []
+  }
+  developmentLogs.value[productId].push(logItem)
+  console.log(`[研发日志] 添加日志到产品 ${productId}，当前日志数：${developmentLogs.value[productId].length}`)
+}
+
+// 初始化开发中产品的研发日志
+const initDevelopmentLogs = () => {
+  if (!gameState.value) return
+  
+  gameState.value.products.forEach(product => {
+    if (product.status === 'developing') {
+      // 如果该产品还没有日志，初始化日志数组
+      if (!developmentLogs.value[product.instanceId]) {
+        developmentLogs.value[product.instanceId] = []
+        
+        // 添加初始日志
+        addDevelopmentLog(product.instanceId, {
+          week: gameState.value.currentWeek,
+          type: 'log',
+          content: `${product.name} 项目启动，开始进行需求分析和技术选型...`,
+          streaming: false
+        })
+      }
+    }
+  })
+}
+
+// 生成每周研发日志（AI流式生成）
+const generateWeeklyDevLog = (product) => {
+  // 先添加一个占位日志条目
+  const logIndex = (developmentLogs.value[product.instanceId] || []).length
+  addDevelopmentLog(product.instanceId, {
+    week: gameState.value.currentWeek,
+    type: 'log',
+    content: '',
+    streaming: true
+  })
+  
+  // 获取参与员工
+  const assignedEmployees = gameState.value.employees.filter(e => e.workingOn === product.instanceId)
+  
+  // 计算团队平均能力
+  const avgProgramming = assignedEmployees.length > 0 
+    ? Math.round(assignedEmployees.reduce((sum, e) => sum + e.programming, 0) / assignedEmployees.length)
+    : 0
+  const avgArt = assignedEmployees.length > 0
+    ? Math.round(assignedEmployees.reduce((sum, e) => sum + e.art, 0) / assignedEmployees.length)
+    : 0
+  const avgBusiness = assignedEmployees.length > 0
+    ? Math.round(assignedEmployees.reduce((sum, e) => sum + e.business, 0) / assignedEmployees.length)
+    : 0
+  
+  // 使用AI生成日志内容
+  aiContentFactory.generateDevLogStream(
+    {
+      productName: product.name,
+      category: product.category,
+      grade: product.grade,
+      solution: product.solution,
+      year: gameState.value.currentYear,
+      era: getCurrentEra(gameState.value.currentYear),
+      employees: assignedEmployees,
+      avgProgramming,
+      avgArt,
+      avgBusiness,
+      teamStatus: '正常',
+      currentTask: product.developmentTodos?.[product.currentTodoIndex] || '开发中',
+      progress: product.developmentProgress,
+      week: gameState.value.currentWeek,
+      totalWeeks: 8,
+      isDelayed: false,
+      logType: 'task_progress'
+    },
+    (chunk, accumulated) => {
+      // 实时更新日志内容（打字机效果）
+      if (developmentLogs.value[product.instanceId] && developmentLogs.value[product.instanceId][logIndex]) {
+        developmentLogs.value[product.instanceId][logIndex].content = accumulated
+      }
+    },
+    (fullContent) => {
+      // 完成后标记为非流式
+      if (developmentLogs.value[product.instanceId] && developmentLogs.value[product.instanceId][logIndex]) {
+        developmentLogs.value[product.instanceId][logIndex].content = fullContent
+        developmentLogs.value[product.instanceId][logIndex].streaming = false
+      }
+    },
+    (error) => {
+      console.error('生成研发日志失败:', error)
+      if (developmentLogs.value[product.instanceId] && developmentLogs.value[product.instanceId][logIndex]) {
+        developmentLogs.value[product.instanceId][logIndex].content = '研发进展顺利'
+        developmentLogs.value[product.instanceId][logIndex].streaming = false
+      }
+    }
+  )
+}
+
 // 生命周期
 onLoad(() => {
   initGame()
+  // 初始化研发日志
+  initDevelopmentLogs()
 })
 
 onShow(() => {
@@ -993,6 +1103,9 @@ onShow(() => {
   const latestState = loadGameState()
   if (latestState) {
     gameState.value = latestState
+    
+    // 初始化开发中产品的研发日志
+    initDevelopmentLogs()
     
     // 如果时间管理器存在且未暂停，则继续运行
     if (timeManager.value) {
@@ -1342,8 +1455,22 @@ onUnmounted(() => {
 .stamina-value {
   font-size: 22rpx;
   font-weight: bold;
-  min-width: 60rpx;
+  min-width: 80rpx;
   text-align: right;
+}
+
+.stamina-critical {
+  color: #E53935;
+  animation: stamina-warning 1.5s infinite;
+}
+
+@keyframes stamina-warning {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .bar-warning {
@@ -1387,6 +1514,46 @@ onUnmounted(() => {
   border: 2px solid #33691E;
   font-size: 20rpx;
   font-weight: bold;
+}
+
+.slacking-badge {
+  padding: 5rpx 12rpx;
+  background: #FF5722;
+  color: #FFF;
+  border: 2px solid #D84315;
+  font-size: 20rpx;
+  font-weight: bold;
+  animation: slacking-blink 2s infinite;
+}
+
+.resting-badge {
+  padding: 5rpx 12rpx;
+  background: #4CAF50;
+  color: #FFF;
+  border: 2px solid #2E7D32;
+  font-size: 20rpx;
+  font-weight: bold;
+}
+
+@keyframes slacking-blink {
+  0%, 50%, 100% {
+    opacity: 1;
+  }
+  25%, 75% {
+    opacity: 0.6;
+  }
+}
+
+.employee-slacking {
+  background: #FFF3E0 !important;
+  border-color: #FF9800 !important;
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3) !important;
+}
+
+.employee-resting {
+  background: #E8F5E9 !important;
+  border-color: #4CAF50 !important;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2) !important;
 }
 
 .tab-bar {
@@ -1620,6 +1787,120 @@ onUnmounted(() => {
   height: 2px;
   background: #D7CCC8;
   margin: 10rpx 0;
+}
+
+/* 研发日志区域 */
+.product-development-logs {
+  margin-top: 15rpx;
+}
+
+.dev-logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #3E2723;
+  padding: 10rpx 15rpx;
+  background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%);
+  border: 2px solid #FBC02D;
+  border-radius: 8rpx 8rpx 0 0;
+  margin-bottom: -2rpx;
+}
+
+.dev-logs-hint {
+  font-size: 20rpx;
+  color: #F57C00;
+  font-weight: normal;
+  opacity: 0.8;
+}
+
+/* 研发日志滚动区 */
+.dev-logs-scroll {
+  height: 400rpx;
+  background: #F9F9F9;
+  border: 2px solid #E0E0E0;
+  border-radius: 0 0 8rpx 8rpx;
+}
+
+.dev-logs-container {
+  padding: 15rpx;
+}
+
+.dev-log-item {
+  margin-bottom: 15rpx;
+  padding: 15rpx;
+  border-radius: 6rpx;
+  border-left: 4px solid #3E2723;
+  background: #FFF;
+  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.05);
+}
+
+.dev-log-todo {
+  border-left-color: #FFC107;
+  background: #FFFBF0;
+}
+
+.dev-log-ai {
+  border-left-color: #2196F3;
+  background: #F0F8FF;
+}
+
+.dev-log-slack {
+  border-left-color: #F44336;
+  background: #FFEBEE;
+}
+
+.dev-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.dev-log-time {
+  font-size: 20rpx;
+  color: #8D6E63;
+  font-weight: bold;
+}
+
+.dev-log-type {
+  font-size: 18rpx;
+  padding: 4rpx 10rpx;
+  border-radius: 4rpx;
+  background: rgba(0, 0, 0, 0.05);
+  color: #5D4037;
+}
+
+.dev-log-content {
+  font-size: 22rpx;
+  color: #3E2723;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.streaming-cursor {
+  display: inline-block;
+  margin-left: 4rpx;
+  animation: blink-cursor 1s infinite;
+  color: #2196F3;
+  font-weight: bold;
+}
+
+@keyframes blink-cursor {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+.dev-logs-empty {
+  padding: 40rpx 20rpx;
+  text-align: center;
+  color: #999;
+  font-size: 22rpx;
 }
 </style>
 

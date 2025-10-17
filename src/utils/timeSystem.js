@@ -158,3 +158,10 @@ export function getEraName(era) {
   return names[era] || 'PC互联网时代';
 }
 
+// 格式化为年月格式（用于新闻显示）
+export function formatYearMonth(year, week) {
+  const weekOfYear = week % TIME_CONFIG.WEEKS_PER_YEAR || TIME_CONFIG.WEEKS_PER_YEAR;
+  const month = Math.ceil(weekOfYear / TIME_CONFIG.WEEKS_PER_MONTH);
+  return `${year}年${month}月`;
+}
+

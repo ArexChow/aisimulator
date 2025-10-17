@@ -592,7 +592,22 @@ class AIContentFactory {
     }
 
     _buildDevLogPrompt(params) {
-        return `你是《软件开发物语》游戏的开发日志生成器。请根据产品开发状态生成一条开发日志。
+        // 获取时代对应的技术栈提示
+        const getTechStackHint = (year, era) => {
+            if (era === 'ai' || year >= 2017) {
+                return '深度学习框架(TensorFlow/PyTorch)、云原生(Docker/K8s)、微服务架构、React/Vue 3、GraphQL、大数据处理';
+            } else if (era === 'mobile' || year >= 2011) {
+                return 'iOS/Android原生开发、React Native、微信小程序、Node.js、MongoDB、RESTful API、响应式设计';
+            } else {
+                return 'Java/PHP/.NET、MySQL/Oracle、Apache/Nginx、jQuery、Ajax、MVC架构、Flash/Silverlight';
+            }
+        };
+        
+        const techHint = getTechStackHint(params.year, params.era);
+        const employeeNames = params.employees?.map(e => e.name).join('、') || '待定';
+        const hasEmployees = params.employees && params.employees.length > 0;
+        
+        return `你是《软件开发物语》游戏的开发日志生成器。请根据产品开发状态生成一条真实的开发日志。
 
 【产品信息】
 - 产品名称：${params.productName}
@@ -600,32 +615,37 @@ class AIContentFactory {
 - 产品等级：${params.grade}
 - 开发方案：${params.solution}
 
+【时代背景】
+- 年份：${params.year}年
+- 时代：${params.era === 'ai' ? 'AI时代' : params.era === 'mobile' ? '移动互联网时代' : 'PC互联网时代'}
+- 主流技术：${techHint}
+
 【团队信息】
-- 参与员工：${params.employees?.map(e => e.name).join('、') || '待定'}
-- 平均编程能力：${params.avgProgramming}
-- 平均美术能力：${params.avgArt}
-- 平均商业能力：${params.avgBusiness}
+- 参与员工：${employeeNames}${hasEmployees ? `（编程${params.avgProgramming}、美术${params.avgArt}、商业${params.avgBusiness}）` : ''}
 - 团队状态：${params.teamStatus}
 
 【开发进度】
 - 当前任务：${params.currentTask}
 - 完成进度：${params.progress}%
 - 开发周数：第${params.week}周 / 共${params.totalWeeks}周
-- 是否超时：${params.isDelayed ? '是' : '否'}
-
-【日志场景】
-${params.logType || 'task_progress'}
+- 是否延期：${params.isDelayed ? '是' : '否'}
 
 【生成要求】
-1. 长度：40-80字
-2. 口吻：像项目日报，专业但轻松
-3. 提及具体的技术细节、设计讨论、产品决策
-4. 体现个性员工的特点
-5. 如有问题，说明解决方式
-6. 体现开发的阶段性进展
+1. 长度：50-80字
+2. 口吻：像项目周报，专业且具体
+3. **必须提及参与的员工姓名**（如"${employeeNames?.split('、')[0] || '某某'}完成了XX"、"${employeeNames?.split('、')[1] || '某某'}正在攻克YY"）
+4. **必须使用符合${params.year}年时代背景的技术栈**，从"${techHint}"中选择合适的技术
+5. 描述具体的技术实现、架构设计或产品决策
+6. 根据进度体现开发阶段（初期-架构搭建，中期-功能开发，后期-测试优化）
+7. 如果团队能力较低（<60），可提及遇到的技术挑战
+8. 避免空洞表述，要有具体细节
 
 【输出格式】
-直接输出日志文本，不要额外说明。`;
+直接输出日志文本，不要前缀、不要额外说明。
+
+示例参考：
+- "${employeeNames?.split('、')[0] || '张三'}完成了用户认证模块，采用JWT方案；${employeeNames?.split('、')[1] || '李四'}优化了数据库索引，查询性能提升40%"
+- "架构评审通过，${employeeNames?.split('、')[0] || '王五'}搭建起基于Spring Boot的后端框架，${employeeNames?.split('、')[1] || '赵六'}完成了React前端脚手架"`;
     }
 
     _buildEmployeeStoryPrompt(params) {
@@ -717,7 +737,7 @@ ${params.scenario || 'steady_operation'}
 - 行业事件：收购、倒闭、IPO等重大事件(5%)
 
 【生成要求】
-1. 新闻长度：15-30字
+1. 新闻长度：50-80字
 2. 语气：客观陈述，使用emoji增强可读性
 3. 时代特征：必须符合${params.era}的技术特点和行业热点
 4. 与玩家相关：如有相关领域产品，可提及该领域
