@@ -13,26 +13,31 @@
       </view>
     </view>
 
-    <!-- 步骤1: 选择产品分类 -->
+    <!-- 步骤1: 选择产品 -->
     <view v-if="currentStep === 0" class="step-content">
-      <view class="pixel-subtitle text-center">选择产品类型</view>
-      <view class="categories-grid">
+      <view class="pixel-subtitle text-center">选择产品</view>
+      <scroll-view scroll-y class="products-list">
         <view 
-          v-for="category in availableCategories" 
-          :key="category.id"
-          class="category-card pixel-card"
-          :class="{ 'category-selected': selectedCategory === category.id }"
-          @click="selectCategory(category.id)"
+          v-for="product in productsInCategory" 
+          :key="product.id"
+          class="product-item pixel-card"
+          :class="{ 'product-selected': selectedProduct === product.id }"
+          @click="selectProduct(product)"
         >
-          <view class="category-icon">{{ category.icon }}</view>
-          <view class="category-name">{{ category.name }}</view>
+          <view class="product-item-header">
+            <view class="product-item-name">{{ product.name }}</view>
+          </view>
+          <view class="product-item-desc">{{ product.description }}</view>
+          <view class="product-item-meta">
+            <text>最少{{ product.minEmployees }}人 | 推荐{{ product.recommendedEmployees }}人</text>
+          </view>
         </view>
-      </view>
+      </scroll-view>
       
-      <view class="button-group mt-40">
+      <view class="button-group mt-20">
         <view 
           class="pixel-btn pixel-btn-success"
-          :class="{ 'pixel-btn-disabled': !selectedCategory }"
+          :class="{ 'pixel-btn-disabled': !selectedProduct }"
           @click="nextStep"
         >
           下一步 →
@@ -43,18 +48,22 @@
       </view>
     </view>
 
-    <!-- 步骤2: 选择具体产品 -->
+    <!-- 步骤2: 产品创意 -->
     <view v-if="currentStep === 1" class="step-content">
-      <view class="pixel-subtitle text-center">选择产品</view>
+      <view class="pixel-subtitle text-center">产品创意</view>
+      
+      <view class="info-text">
+        已选择产品：<text class="highlight-text">{{ selectedProductTemplate?.name || '未选择' }}</text>
+      </view>
       
       <!-- AI创意生成按钮 -->
-      <view class="ai-ideas-section mb-20">
+      <view class="ai-ideas-section">
         <view 
           class="pixel-btn pixel-btn-info"
           @click="getProductIdeas"
           :class="{ 'pixel-btn-disabled': generatingIdeas }"
         >
-          {{ generatingIdeas ? '生成中...' : '💡 获取创意' }}
+          {{ generatingIdeas ? '生成中...' : '💡 AI生成创意方案' }}
         </view>
         
         <!-- 流式生成的JSON文本展示 -->
@@ -92,32 +101,17 @@
 
       <view class="pixel-divider my-20"></view>
       
-      <view class="pixel-subtitle text-center">或选择预设产品</view>
-      <scroll-view scroll-y class="products-list">
-        <view 
-          v-for="product in productsInCategory" 
-          :key="product.id"
-          class="product-item pixel-card"
-          :class="{ 'product-selected': selectedProduct === product.id }"
-          @click="selectProduct(product)"
-        >
-          <view class="product-item-header">
-            <view class="product-item-name">{{ product.name }}</view>
-            <view class="pixel-badge" :class="'badge-' + product.grade.toLowerCase()">
-              {{ product.grade }}级
-            </view>
-          </view>
-          <view class="product-item-desc">{{ product.description }}</view>
-          <view class="product-item-meta">
-            <text>最少{{ product.minEmployees }}人 | 推荐{{ product.recommendedEmployees }}人</text>
-          </view>
+      <view class="direct-config-section">
+        <view class="pixel-subtitle text-center">或直接使用产品名称</view>
+        <view class="info-text text-center">
+          当前产品名：<text class="highlight-text">{{ productName || '未设置' }}</text>
         </view>
-      </scroll-view>
+      </view>
       
-      <view class="button-group mt-20">
+      <view class="button-group mt-40">
         <view 
           class="pixel-btn pixel-btn-success"
-          :class="{ 'pixel-btn-disabled': !selectedProduct }"
+          :class="{ 'pixel-btn-disabled': !productName }"
           @click="nextStep"
         >
           下一步 →
@@ -235,13 +229,15 @@ import { aiContentFactory } from '@/utils/aiContentFactory'
 // 状态数据
 const gameState = ref(null)
 const currentStep = ref(0)
-const steps = ['选择类型', '选择产品', '配置开发']
+const steps = ['选择产品', '产品创意', '配置开发']
 
 // 选择状态
 const selectedCategory = ref(null)
 const selectedProduct = ref(null)
 const selectedProductTemplate = ref(null)
 const productName = ref('')
+const productSlogan = ref('')
+const productDescription = ref('')
 const selectedMonetization = ref(null)
 const selectedSolution = ref('balanced')
 const selectedEmployees = ref([])
@@ -285,8 +281,8 @@ const initData = () => {
     return
   }
   
-  // 加载可用分类
-  availableCategories.value = getAvailableCategories(gameState.value.currentYear)
+  // 加载所有可用产品（当前时代和之前时代）
+  productsInCategory.value = getAvailableProducts(gameState.value.currentYear)
   
   // 加载变现方式
   availableMonetizations.value = getUnlockedMonetizationMethods(gameState.value.currentYear)
@@ -298,12 +294,10 @@ const initData = () => {
   idleEmployees.value = getIdleEmployees(gameState.value.employees)
 }
 
+// 分类选择已移除，不再需要此函数
 const selectCategory = (categoryId) => {
+  // 保留函数以防止错误，但不再使用
   selectedCategory.value = categoryId
-  
-  // 加载该分类下的产品
-  productsInCategory.value = getAvailableProducts(gameState.value.currentYear)
-    .filter(p => p.category === categoryId)
 }
 
 const selectProduct = (product) => {
@@ -315,6 +309,10 @@ const selectProduct = (product) => {
   if (!selectedMonetization.value) {
     selectedMonetization.value = product.defaultMonetization
   }
+  
+  // 清空之前的创意
+  productIdeas.value = []
+  streamingIdeasText.value = ''
 }
 
 const selectMonetization = (methodId) => {
@@ -349,17 +347,17 @@ const isEmployeeSelected = (employeeId) => {
 }
 
 const nextStep = () => {
-  if (currentStep.value === 0 && !selectedCategory.value) {
+  if (currentStep.value === 0 && !selectedProduct.value) {
     uni.showToast({
-      title: '请选择产品类型',
+      title: '请选择产品',
       icon: 'none'
     })
     return
   }
   
-  if (currentStep.value === 1 && !selectedProduct.value) {
+  if (currentStep.value === 1 && !productName.value) {
     uni.showToast({
-      title: '请选择产品',
+      title: '请设置产品名称',
       icon: 'none'
     })
     return
@@ -387,7 +385,9 @@ const startDevelopment = () => {
     productName.value,
     selectedMonetization.value,
     selectedEmployees.value.map(e => e.id),
-    selectedSolution.value
+    selectedSolution.value,
+    productSlogan.value,
+    productDescription.value
   )
   
   // 生成开发任务
@@ -429,6 +429,15 @@ const goBack = () => {
 
 const getProductIdeas = async () => {
   if (generatingIdeas.value) return
+  
+  if (!selectedProductTemplate.value) {
+    uni.showToast({
+      title: '请先选择产品类型',
+      icon: 'none'
+    })
+    return
+  }
+  
   generatingIdeas.value = true
   streamingIdeasText.value = '' // 清空之前的流式文本
   productIdeas.value = [] // 清空之前的创意
@@ -438,15 +447,7 @@ const getProductIdeas = async () => {
     {
       year: gameState.value.currentYear,
       era: gameState.value.era,
-      companyName: gameState.value.companyName,
-      existingProducts: gameState.value.products?.map(p => p.name) || [],
-      companyStrength: '技术导向',
-      category: selectedCategory.value,
-      grade: 'C',
-      monetization: selectedMonetization.value || 'ad',
-      trendingTopics: ['产品创新', '用户体验'],
-      competitors: [],
-      userPainPoints: []
+      productType: selectedProductTemplate.value.name // 传入产品类型名称
     },
     (chunk, accumulated) => {
       // 实时更新流式文本（打字机效果）
@@ -484,14 +485,11 @@ const getProductIdeas = async () => {
 
 const useProductIdea = (idea) => {
   productName.value = idea.name
-  selectedProduct.value = null // 清空预设产品选择
-  selectedProductTemplate.value = null
-  selectedMonetization.value = null
-  selectedSolution.value = 'balanced'
-  selectedEmployees.value = []
+  productSlogan.value = idea.slogan || ''
+  productDescription.value = idea.description || ''
   uni.showToast({
-    title: `使用创意: ${idea.name}`,
-    icon: 'none'
+    title: `已应用创意: ${idea.name}`,
+    icon: 'success'
   })
 }
 
@@ -690,7 +688,7 @@ onLoad(() => {
 }
 
 .products-list {
-  height: 900rpx;
+  height: 1000rpx;
   margin-top: 30rpx;
 }
 
@@ -742,6 +740,7 @@ onLoad(() => {
 }
 
 .pixel-input {
+  height: 85rpx;
   width: 100%;
   padding: 20rpx;
   background: #FFF;
@@ -848,6 +847,22 @@ onLoad(() => {
 .button-group {
   display: flex;
   flex-direction: column;
+}
+
+.info-text {
+  font-size: 26rpx;
+  color: #5D4037;
+  margin: 20rpx 0;
+  text-align: center;
+}
+
+.highlight-text {
+  font-weight: bold;
+  color: #3E2723;
+}
+
+.direct-config-section {
+  margin-top: 20rpx;
 }
 </style>
 

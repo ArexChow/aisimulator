@@ -211,6 +211,7 @@ onLoad(() => {
 }
 
 .pixel-input {
+  height: 85rpx;
   flex: 1;
   padding: 20rpx;
   background: #FFF;

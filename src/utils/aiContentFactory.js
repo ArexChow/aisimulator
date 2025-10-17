@@ -84,7 +84,9 @@ class AIContentFactory {
                     // 尝试解析JSON
                     let result;
                     try {
-                        result = JSON.parse(fullContent);
+                        const parsed = JSON.parse(fullContent);
+                        // 如果返回的是单个对象，包装成数组
+                        result = Array.isArray(parsed) ? parsed : [parsed];
                     } catch (e) {
                         console.warn('产品创意JSON解析失败:', e);
                         result = [];
@@ -557,38 +559,29 @@ class AIContentFactory {
     // ========== Prompt构建方法 ==========
 
     _buildProductIdeasPrompt(params) {
-        return `你是《软件开发物语》游戏的产品经理助手。请根据游戏状态和产品类型，生成有创意的产品方案。
+        return `你是《软件开发物语》游戏的产品经理助手。请根据产品类型生成一个有创意的产品方案。
 
 【游戏背景】
 - 当前年份：${params.year}年
 - 时代：${params.era}
-- 玩家公司：${params.companyName}
-- 已有产品：${params.existingProducts?.join('、') || '无'}
-- 公司特点：${params.companyStrength}
 
 【产品需求】
-- 产品类型：${params.category}
-- 产品等级：${params.grade}级
-- 变现方式：${params.monetization}
-
-【市场环境】
-- 当前热点：${params.trendingTopics?.join('、') || '市场稳定'}
-- 竞争对手：${params.competitors?.join('、') || '无数据'}
-- 用户痛点：${params.userPainPoints?.join('、') || '未知'}
+- 产品类型：${params.productType}（这是产品的大类，你需要为这个类型设计一个具体的产品）
 
 【生成要求】
-1. 生成3个不同风格的产品创意
-2. 每个创意包含：name(3-8字), slogan(8-15字), description(30-50字), highlights(1-2个关键特性)
-3. 符合时代背景
-4. 等级匹配：C级-单点功能小而美、B级-多功能平台、A级-行业革新、S级-跨行业整合
-5. 创意要合理，避免科幻化
+1. 只生成1个产品创意
+2. 包含字段：
+   - name: 产品名称，3-8个字，要有创意和辨识度
+   - slogan: 产品口号，8-15个字，体现产品核心价值
+   - description: 产品描述，30-50个字，说明产品功能和特点
+   - highlights: 1-2个关键特性，每个5-10个字
+3. 必须符合${params.year}年${params.era}的时代背景
+4. 创意要合理可行，不要科幻化
+5. 针对${params.productType}这个类型，设计独特且有吸引力的具体产品
 
 【输出格式】
-返回JSON数组：
-[
-  {"name": "产品名称", "slogan": "slogan", "description": "描述", "highlights": ["特性1", "特性2"]},
-  ...
-]`;
+返回JSON对象：
+{"name": "产品名称", "slogan": "产品口号", "description": "产品描述", "highlights": ["特性1", "特性2"]}`;
     }
 
     _buildDevLogPrompt(params) {

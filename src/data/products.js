@@ -24,7 +24,7 @@ const PC_ERA_PRODUCTS = [
     name: '即时通讯软件',
     description: '让用户可以在线聊天、发送文件的软件',
     category: 'social',
-    grade: 'C',
+    grade: 'S', // QQ类产品，最终成为国民级应用
     year: 2000,
     minEmployees: 1,
     recommendedEmployees: 2,
@@ -35,7 +35,7 @@ const PC_ERA_PRODUCTS = [
     name: '网络论坛',
     description: '用户可以发帖讨论的社区平台',
     category: 'social',
-    grade: 'C',
+    grade: 'B', // 中等用户基数
     year: 2001,
     minEmployees: 1,
     recommendedEmployees: 2,
@@ -46,7 +46,7 @@ const PC_ERA_PRODUCTS = [
     name: '博客平台',
     description: '个人博客发布和管理系统',
     category: 'content',
-    grade: 'C',
+    grade: 'B', // 中等用户基数
     year: 2002,
     minEmployees: 1,
     recommendedEmployees: 2,
@@ -112,7 +112,7 @@ const PC_ERA_PRODUCTS = [
     name: '搜索引擎',
     description: '网页搜索服务',
     category: 'other',
-    grade: 'A',
+    grade: 'S', // 百度/Google级别的国民级产品
     year: 2000,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -134,7 +134,7 @@ const PC_ERA_PRODUCTS = [
     name: '在线支付',
     description: '第三方支付平台',
     category: 'fintech',
-    grade: 'A',
+    grade: 'S', // 支付宝级别的国民级产品
     year: 2004,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -145,7 +145,7 @@ const PC_ERA_PRODUCTS = [
     name: '视频分享网站',
     description: '用户上传和分享视频的平台',
     category: 'video',
-    grade: 'B',
+    grade: 'A', // B站/优酷级别的高用户基数
     year: 2006,
     minEmployees: 2,
     recommendedEmployees: 3,
@@ -156,7 +156,7 @@ const PC_ERA_PRODUCTS = [
     name: '微博平台',
     description: '社交媒体和信息分享平台',
     category: 'social',
-    grade: 'B',
+    grade: 'A', // 微博级别的高用户基数
     year: 2009,
     minEmployees: 2,
     recommendedEmployees: 3,
@@ -331,7 +331,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '移动聊天应用',
     description: '手机上的即时通讯应用',
     category: 'social',
-    grade: 'A',
+    grade: 'S', // 微信级别的国民级应用
     year: 2011,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -342,7 +342,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '网约车平台',
     description: '打车出行服务平台',
     category: 'other',
-    grade: 'A',
+    grade: 'A', // 滴滴级别的高用户基数
     year: 2012,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -353,7 +353,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '外卖平台',
     description: '在线订餐配送服务',
     category: 'ecommerce',
-    grade: 'B',
+    grade: 'A', // 美团外卖/饿了么级别的高用户基数
     year: 2013,
     minEmployees: 2,
     recommendedEmployees: 3,
@@ -364,7 +364,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '在线音乐',
     description: '音乐流媒体平台',
     category: 'media',
-    grade: 'B',
+    grade: 'A', // 网易云音乐/QQ音乐级别的高用户基数
     year: 2013,
     minEmployees: 2,
     recommendedEmployees: 3,
@@ -375,7 +375,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '短视频平台',
     description: '短视频拍摄和分享社区',
     category: 'video',
-    grade: 'A',
+    grade: 'S', // 抖音/快手级别的国民级应用
     year: 2016,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -386,7 +386,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '生活分享社区',
     description: '用户分享生活方式的平台',
     category: 'social',
-    grade: 'A',
+    grade: 'A', // 小红书级别的高用户基数
     year: 2013,
     minEmployees: 2,
     recommendedEmployees: 3,
@@ -397,7 +397,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '社交电商',
     description: '社交拼团购物平台',
     category: 'ecommerce',
-    grade: 'A',
+    grade: 'A', // 拼多多级别的高用户基数
     year: 2015,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -441,7 +441,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: 'AI推荐引擎',
     description: '智能内容推荐系统',
     category: 'tool',
-    grade: 'A',
+    grade: 'B', // 技术工具类产品，中等用户基数
     year: 2018,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -509,7 +509,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '移动支付',
     description: '手机扫码支付工具',
     category: 'fintech',
-    grade: 'A',
+    grade: 'S', // 支付宝/微信支付级别的国民级应用
     year: 2011,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -565,7 +565,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: 'K12在线辅导',
     description: '中小学在线教育平台',
     category: 'education',
-    grade: 'A',
+    grade: 'A', // 作业帮/猿辅导级别的高用户基数
     year: 2014,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -632,7 +632,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '内容付费平台',
     description: '知识付费和内容变现',
     category: 'content',
-    grade: 'A',
+    grade: 'A', // 得到/知识星球级别的高用户基数
     year: 2016,
     minEmployees: 2,
     recommendedEmployees: 3,
@@ -644,7 +644,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '直播平台',
     description: '视频直播互动平台',
     category: 'media',
-    grade: 'A',
+    grade: 'A', // 斗鱼/虎牙级别的高用户基数
     year: 2014,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -735,7 +735,7 @@ const MOBILE_ERA_PRODUCTS = [
     name: '共享单车',
     description: '无桩共享单车服务',
     category: 'transport',
-    grade: 'A',
+    grade: 'A', // ofo/摩拜级别的高用户基数
     year: 2015,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -772,7 +772,7 @@ const IOT_ERA_PRODUCTS = [
     name: 'AI对话系统',
     description: '大语言模型对话应用',
     category: 'tool',
-    grade: 'A',
+    grade: 'A', // ChatGPT级别的高用户基数
     year: 2022,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -795,7 +795,7 @@ const IOT_ERA_PRODUCTS = [
     name: '云游戏平台',
     description: '基于云端的游戏串流服务',
     category: 'game',
-    grade: 'A',
+    grade: 'A', // 云游戏具有高用户基数潜力
     year: 2021,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -806,7 +806,7 @@ const IOT_ERA_PRODUCTS = [
     name: 'VR游戏',
     description: '虚拟现实游戏体验',
     category: 'game',
-    grade: 'A',
+    grade: 'A', // VR游戏具有高用户基数潜力
     year: 2023,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -829,7 +829,7 @@ const IOT_ERA_PRODUCTS = [
     name: '数字货币交易所',
     description: '加密货币交易平台',
     category: 'fintech',
-    grade: 'A',
+    grade: 'A', // 币安级别的高用户基数
     year: 2022,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -852,7 +852,7 @@ const IOT_ERA_PRODUCTS = [
     name: 'AI家教',
     description: '人工智能个性化辅导',
     category: 'education',
-    grade: 'A',
+    grade: 'A', // AI教育具有高用户基数潜力
     year: 2023,
     minEmployees: 3,
     recommendedEmployees: 4,
@@ -886,7 +886,7 @@ const IOT_ERA_PRODUCTS = [
     name: 'AIGC创作平台',
     description: 'AI生成内容创作工具',
     category: 'content',
-    grade: 'A',
+    grade: 'A', // Midjourney/Stable Diffusion级别的高用户基数
     year: 2023,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -897,7 +897,7 @@ const IOT_ERA_PRODUCTS = [
     name: 'AI视频生成',
     description: 'AI自动生成视频工具',
     category: 'video',
-    grade: 'A',
+    grade: 'A', // Sora级别的高用户基数潜力
     year: 2024,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -932,7 +932,7 @@ const IOT_ERA_PRODUCTS = [
     name: 'AI诊断系统',
     description: '人工智能辅助诊疗',
     category: 'healthcare',
-    grade: 'A',
+    grade: 'A', // 医疗AI具有高用户基数潜力
     year: 2022,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -1000,7 +1000,7 @@ const IOT_ERA_PRODUCTS = [
     name: '无人机配送',
     description: '智能无人机物流',
     category: 'transport',
-    grade: 'A',
+    grade: 'A', // 未来物流具有高用户基数潜力
     year: 2023,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -1023,7 +1023,7 @@ const IOT_ERA_PRODUCTS = [
     name: 'AI编程助手',
     description: '智能代码生成工具',
     category: 'tool',
-    grade: 'A',
+    grade: 'A', // GitHub Copilot级别的高用户基数
     year: 2023,
     minEmployees: 4,
     recommendedEmployees: 5,
@@ -1070,10 +1070,9 @@ function getPreviousEra(currentEra) {
   return null; // PC时代没有上一个时代
 }
 
-// 根据年份获取可用产品（当前时代 + 上一个时代）
+// 根据年份获取可用产品（当前时代及之前所有时代）
 export function getAvailableProducts(currentYear) {
   const currentEra = getCurrentEra(currentYear);
-  const previousEra = getPreviousEra(currentEra);
   
   // 定义每个时代包含的产品
   const eraProducts = {
@@ -1082,16 +1081,21 @@ export function getAvailableProducts(currentYear) {
     IOT: IOT_ERA_PRODUCTS
   };
   
-  // 当前时代的产品
-  let availableProducts = [...eraProducts[currentEra]];
+  let availableProducts = [];
   
-  // 如果有上一个时代，加入上一个时代的产品
-  if (previousEra) {
-    availableProducts = [...eraProducts[previousEra], ...availableProducts];
+  // 根据当前时代，返回该时代及之前所有时代的产品
+  if (currentEra === 'PC') {
+    // PC时代：只能做PC时代的产品
+    availableProducts = [...PC_ERA_PRODUCTS];
+  } else if (currentEra === 'MOBILE') {
+    // MOBILE时代：可以做PC和MOBILE时代的产品
+    availableProducts = [...PC_ERA_PRODUCTS, ...MOBILE_ERA_PRODUCTS];
+  } else if (currentEra === 'IOT') {
+    // IOT时代：可以做所有三个时代的产品
+    availableProducts = [...PC_ERA_PRODUCTS, ...MOBILE_ERA_PRODUCTS, ...IOT_ERA_PRODUCTS];
   }
   
-  // 只返回年份小于等于当前年份的产品
-  return availableProducts.filter(product => product.year <= currentYear);
+  return availableProducts;
 }
 
 // 根据分类获取产品
@@ -1117,7 +1121,7 @@ export function getProductById(productId) {
 }
 
 // 创建产品实例（用于实际游戏中）
-export function createProductInstance(templateId, customName, monetization, assignedEmployees, solution) {
+export function createProductInstance(templateId, customName, monetization, assignedEmployees, solution, slogan = '', description = '') {
   const template = getProductById(templateId);
   if (!template) return null;
   
@@ -1125,7 +1129,8 @@ export function createProductInstance(templateId, customName, monetization, assi
     instanceId: Date.now() + Math.random(),
     templateId: template.id,
     name: customName || template.name,
-    description: template.description,
+    slogan: slogan, // AI生成的产品口号
+    description: description || template.description, // AI生成的产品描述，或使用模板描述
     category: template.category,
     grade: template.grade,
     logo: PRODUCT_CATEGORIES[template.category].icon, // 产品logo，使用分类图标
