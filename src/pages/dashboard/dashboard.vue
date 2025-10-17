@@ -11,8 +11,8 @@
         <text class="money-value">{{ formatMoney(gameState.money) }}</text>
       </view>
       <view class="action-buttons">
-        <view class="pixel-btn-mini" @click="togglePause">
-          {{ isPaused ? '▶' : '⏸' }}
+        <view class="pixel-btn-mini pixel-btn-save" @click="saveGame">
+          💾 保存
         </view>
         <view class="pixel-btn-mini" @click="showFinanceDialog">
           融资
@@ -323,7 +323,6 @@ import { aiContentFactory } from '@/utils/aiContentFactory'
 // 状态数据
 const gameState = ref(null)
 const timeManager = ref(null)
-const isPaused = ref(false)
 const currentTheme = ref(null)
 const lastEra = ref(null)
 const currentTab = ref('products')
@@ -669,12 +668,23 @@ const handleBankruptcy = () => {
   })
 }
 
-const togglePause = () => {
-  isPaused.value = !isPaused.value
-  if (isPaused.value) {
-    timeManager.value?.pause()
+const saveGame = () => {
+  if (!gameState.value) return
+  
+  // 保存游戏状态
+  const success = saveGameState(gameState.value)
+  
+  if (success) {
+    uni.showToast({
+      title: '进度已保存',
+      icon: 'success',
+      duration: 1500
+    })
   } else {
-    timeManager.value?.start()
+    uni.showToast({
+      title: '保存失败',
+      icon: 'none'
+    })
   }
 }
 
@@ -704,6 +714,8 @@ const formatNewsTime = (week) => {
 }
 
 const goToNewProduct = () => {
+  // 保存游戏状态
+  saveGameState(gameState.value)
   timeManager.value?.pause()
   uni.navigateTo({
     url: '/pages/new-product/new-product'
@@ -711,6 +723,8 @@ const goToNewProduct = () => {
 }
 
 const goToRecruit = () => {
+  // 保存游戏状态
+  saveGameState(gameState.value)
   timeManager.value?.pause()
   uni.navigateTo({
     url: '/pages/recruit/recruit'
@@ -718,8 +732,6 @@ const goToRecruit = () => {
 }
 
 const promoteProduct = (product) => {
-  timeManager.value?.pause()
-  
   // 显示推广选项
   uni.showActionSheet({
     itemList: [
@@ -739,7 +751,6 @@ const promoteProduct = (product) => {
           title: '资金不足',
           icon: 'none'
         })
-        timeManager.value?.start()
         return
       }
       
@@ -757,16 +768,13 @@ const promoteProduct = (product) => {
         title: '推广成功！',
         icon: 'success'
       })
-      
-      timeManager.value?.start()
-    },
-    fail: () => {
-      timeManager.value?.start()
     }
   })
 }
 
 const upgradeProduct = (product) => {
+  // 保存游戏状态
+  saveGameState(gameState.value)
   timeManager.value?.pause()
   uni.navigateTo({
     url: `/pages/product-upgrade/product-upgrade?productId=${product.instanceId}`
@@ -1107,17 +1115,19 @@ onShow(() => {
     // 初始化开发中产品的研发日志
     initDevelopmentLogs()
     
-    // 如果时间管理器存在且未暂停，则继续运行
+    // 重启时间管理器（始终继续运行）
     if (timeManager.value) {
       timeManager.value.setTime(latestState.currentYear, latestState.currentWeek)
-      if (!isPaused.value) {
-        timeManager.value.start()
-      }
+      timeManager.value.start()
     }
   }
 })
 
 onHide(() => {
+  // 离开页面时保存游戏状态并暂停
+  if (gameState.value) {
+    saveGameState(gameState.value)
+  }
   timeManager.value?.pause()
 })
 
@@ -1209,6 +1219,16 @@ onUnmounted(() => {
 .pixel-btn-success {
   background: #558B2F;
   border-color: #33691E;
+}
+
+.pixel-btn-save {
+  background: #2196F3;
+  border-color: #1565C0;
+}
+
+.pixel-btn-save:active {
+  background: #1565C0;
+  transform: scale(0.95);
 }
 
 .main-content {
