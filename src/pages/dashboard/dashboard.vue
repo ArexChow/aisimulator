@@ -121,7 +121,7 @@
                     </view>
                   </view>
                   
-                  <view v-if="!developmentLogs[product.instanceId] || developmentLogs[product.instanceId].length === 0" class="dev-logs-empty">
+                  <view v-if="getReversedLogs(product.instanceId).length === 0" class="dev-logs-empty">
                     研发进行中，日志加载中...
                   </view>
                 </view>
@@ -308,7 +308,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { onLoad, onShow, onHide } from '@dcloudio/uni-app'
 import { loadGameState, saveGameState, addNews, updateProduct, updateEmployee, removeProduct, removeEmployee, updateFinancingCooldown, addFinancing } from '@/utils/storage'
 import { TimeManager, formatTime, getCurrentEra, formatYearMonth } from '@/utils/timeSystem'
@@ -334,11 +334,16 @@ const selectedProductComments = ref(null)
 const productComments = ref({})
 // 研发进度日志（每周）
 const developmentLogs = ref({}) // 格式：{ productId: [{ week: 1, type: 'todo'|'log', content: 'xxx', streaming: false }] }
+// 星期几显示（1-7，对应周一到周日）
+const currentWeekday = ref(1)
+const weekdayTimer = ref(null)
 
 // 计算属性
 const timeDisplay = computed(() => {
   if (!gameState.value) return ''
-  return formatTime(gameState.value.currentYear, gameState.value.currentWeek)
+  const weekdayNames = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+  const weekdayText = weekdayNames[currentWeekday.value - 1] || '星期一'
+  return `${formatTime(gameState.value.currentYear, gameState.value.currentWeek)}（${weekdayText}）`
 })
 
 const moneyStatus = computed(() => {
@@ -352,11 +357,64 @@ const filteredProducts = computed(() => {
   return gameState.value.products.filter(p => p.instanceId === selectedProductFilter.value)
 })
 
+// 安全的研发日志访问 - 确保返回的数据总是有效的
+const safeDevelopmentLogs = computed(() => {
+  if (!developmentLogs.value || typeof developmentLogs.value !== 'object' || Array.isArray(developmentLogs.value)) {
+    return {}
+  }
+  return developmentLogs.value
+})
+
 // 获取反转后的日志列表（最新的在最上面）
 const getReversedLogs = (productId) => {
-  const logs = developmentLogs.value[productId]
-  if (!logs || logs.length === 0) return []
-  return [...logs].reverse()
+  const logs = safeDevelopmentLogs.value[productId]
+  if (!logs || !Array.isArray(logs) || logs.length === 0) {
+    return []
+  }
+  // 过滤掉任何 null 或 undefined 元素
+  const validLogs = logs.filter(log => log && typeof log === 'object')
+  return [...validLogs].reverse()
+}
+
+// 辅助函数：安全保存游戏状态（包括研发日志）
+const saveGameWithLogs = () => {
+  if (!gameState.value) return false
+  
+  try {
+    // 确保 developmentLogs.value 是一个对象
+    let logsToSave = {}
+    
+    if (developmentLogs.value && typeof developmentLogs.value === 'object' && !Array.isArray(developmentLogs.value)) {
+      // 清理数据：只保存有效的日志
+      for (const productId in developmentLogs.value) {
+        const logs = developmentLogs.value[productId]
+        if (Array.isArray(logs) && logs.length > 0) {
+          // 过滤掉 null、undefined 和非对象元素
+          const validLogs = logs.filter(log => {
+            return log && typeof log === 'object' && log.week && log.type && log.content !== undefined
+          })
+          if (validLogs.length > 0) {
+            logsToSave[productId] = validLogs
+          }
+        }
+      }
+    }
+    
+    // 深拷贝研发日志，避免引用问题和响应式数据问题
+    gameState.value.developmentLogs = JSON.parse(JSON.stringify(logsToSave))
+    
+    return saveGameState(gameState.value)
+  } catch (error) {
+    console.error('保存游戏状态失败:', error)
+    // 如果保存失败，清空 developmentLogs 以避免污染游戏状态
+    try {
+      gameState.value.developmentLogs = {}
+      return saveGameState(gameState.value)
+    } catch (e) {
+      console.error('二次保存也失败:', e)
+      return false
+    }
+  }
 }
 
 // 方法
@@ -374,6 +432,27 @@ const initGame = () => {
   }
   
   gameState.value = savedState
+  
+  // 恢复研发日志数据（确保是一个对象）
+  try {
+    if (gameState.value.developmentLogs && typeof gameState.value.developmentLogs === 'object' && !Array.isArray(gameState.value.developmentLogs)) {
+      // 深拷贝以避免引用问题，并过滤掉无效值
+      const rawLogs = JSON.parse(JSON.stringify(gameState.value.developmentLogs))
+      // 确保每个产品的日志都是数组
+      const validLogs = {}
+      for (const key in rawLogs) {
+        if (Array.isArray(rawLogs[key])) {
+          validLogs[key] = rawLogs[key].filter(log => log && typeof log === 'object')
+        }
+      }
+      developmentLogs.value = validLogs
+    } else {
+      developmentLogs.value = {}
+    }
+  } catch (error) {
+    console.error('恢复研发日志失败:', error)
+    developmentLogs.value = {}
+  }
   
   // 初始化时间管理器
   timeManager.value = new TimeManager()
@@ -499,8 +578,8 @@ const handleWeekPass = async (timeData) => {
     }
   }
   
-  // 4. 保存游戏状态
-  saveGameState(gameState.value)
+  // 4. 保存游戏状态（包括研发日志）
+  saveGameWithLogs()
   
   // 5. 更新未读新闻计数
   updateUnreadNewsCount()
@@ -585,14 +664,14 @@ const handleMonthPass = async (timeData) => {
       // 完成后添加到新闻列表
       if (fullContent) {
         addNews(gameState.value, { content: fullContent })
-        saveGameState(gameState.value)
+        saveGameWithLogs()
       }
     },
     (error) => {
       console.error('AI新闻生成失败:', error)
       // AI生成失败时添加简单提示，不使用预设新闻
       addNews(gameState.value, { content: '📰 行业资讯生成中，请稍候...' })
-      saveGameState(gameState.value)
+      saveGameWithLogs()
     }
   )
   
@@ -606,7 +685,7 @@ const handleMonthPass = async (timeData) => {
     }
   })
   
-  saveGameState(gameState.value)
+  saveGameWithLogs()
 }
 
 const launchProduct = (product) => {
@@ -671,8 +750,8 @@ const handleBankruptcy = () => {
 const saveGame = () => {
   if (!gameState.value) return
   
-  // 保存游戏状态
-  const success = saveGameState(gameState.value)
+  // 保存游戏状态（包括研发日志）
+  const success = saveGameWithLogs()
   
   if (success) {
     uni.showToast({
@@ -715,7 +794,7 @@ const formatNewsTime = (week) => {
 
 const goToNewProduct = () => {
   // 保存游戏状态
-  saveGameState(gameState.value)
+  saveGameWithLogs()
   timeManager.value?.pause()
   uni.navigateTo({
     url: '/pages/new-product/new-product'
@@ -724,7 +803,7 @@ const goToNewProduct = () => {
 
 const goToRecruit = () => {
   // 保存游戏状态
-  saveGameState(gameState.value)
+  saveGameWithLogs()
   timeManager.value?.pause()
   uni.navigateTo({
     url: '/pages/recruit/recruit'
@@ -762,7 +841,7 @@ const promoteProduct = (product) => {
         content: `${product.name} 投放${method.name}，DAU增加${method.dauBoost}`
       })
       
-      saveGameState(gameState.value)
+      saveGameWithLogs()
       
       uni.showToast({
         title: '推广成功！',
@@ -774,7 +853,7 @@ const promoteProduct = (product) => {
 
 const upgradeProduct = (product) => {
   // 保存游戏状态
-  saveGameState(gameState.value)
+  saveGameWithLogs()
   timeManager.value?.pause()
   uni.navigateTo({
     url: `/pages/product-upgrade/product-upgrade?productId=${product.instanceId}`
@@ -798,7 +877,7 @@ const offlineProduct = (product) => {
         addNews(gameState.value, {
           content: `${product.name} 已下架`
         })
-        saveGameState(gameState.value)
+        saveGameWithLogs()
       }
     }
   })
@@ -857,7 +936,7 @@ const pepTalk = (employee) => {
       title: '画大饼成功！',
       icon: 'success'
     })
-    saveGameState(gameState.value)
+    saveGameWithLogs()
   } else {
     uni.showToast({
       title: result.message,
@@ -873,7 +952,7 @@ const walkBy = (employee) => {
       title: '员工恢复工作了',
       icon: 'success'
     })
-    saveGameState(gameState.value)
+    saveGameWithLogs()
   }
 }
 
@@ -890,7 +969,7 @@ const confirmFire = (employee) => {
           addNews(gameState.value, {
             content: `${employee.name} 已离职，支付赔偿金¥${severancePay}`
           })
-          saveGameState(gameState.value)
+          saveGameWithLogs()
           uni.showToast({
             title: '已解雇',
             icon: 'success'
@@ -933,7 +1012,7 @@ const showFinanceDialog = () => {
           content: `💰 成功融资¥${FINANCING_CONFIG.amount}，当前资金¥${formatMoney(gameState.value.money)}`
         })
         
-        saveGameState(gameState.value)
+        saveGameWithLogs()
         
         uni.showToast({
           title: '融资成功！',
@@ -1001,9 +1080,15 @@ const updateUnreadNewsCount = () => {
 
 // 添加研发日志条目
 const addDevelopmentLog = (productId, logItem) => {
+  // 确保 developmentLogs.value 是一个对象
+  if (!developmentLogs.value || typeof developmentLogs.value !== 'object') {
+    developmentLogs.value = {}
+  }
+  
   if (!developmentLogs.value[productId]) {
     developmentLogs.value[productId] = []
   }
+  
   developmentLogs.value[productId].push(logItem)
   console.log(`[研发日志] 添加日志到产品 ${productId}，当前日志数：${developmentLogs.value[productId].length}`)
 }
@@ -1012,19 +1097,26 @@ const addDevelopmentLog = (productId, logItem) => {
 const initDevelopmentLogs = () => {
   if (!gameState.value) return
   
+  // 确保 developmentLogs.value 是一个对象
+  if (!developmentLogs.value || typeof developmentLogs.value !== 'object') {
+    developmentLogs.value = {}
+  }
+  
   gameState.value.products.forEach(product => {
     if (product.status === 'developing') {
       // 如果该产品还没有日志，初始化日志数组
       if (!developmentLogs.value[product.instanceId]) {
         developmentLogs.value[product.instanceId] = []
         
-        // 添加初始日志
-        addDevelopmentLog(product.instanceId, {
-          week: gameState.value.currentWeek,
-          type: 'log',
-          content: `${product.name} 项目启动，开始进行需求分析和技术选型...`,
-          streaming: false
-        })
+        // 只有在进度为0时才添加初始日志（说明是新产品）
+        if (product.developmentProgress === 0) {
+          addDevelopmentLog(product.instanceId, {
+            week: gameState.value.currentWeek,
+            type: 'log',
+            content: `${product.name} 项目启动，开始进行需求分析和技术选型...`,
+            streaming: false
+          })
+        }
       }
     }
   })
@@ -1032,6 +1124,11 @@ const initDevelopmentLogs = () => {
 
 // 生成每周研发日志（AI流式生成）
 const generateWeeklyDevLog = (product) => {
+  // 确保 developmentLogs.value 是一个对象
+  if (!developmentLogs.value || typeof developmentLogs.value !== 'object') {
+    developmentLogs.value = {}
+  }
+  
   // 先添加一个占位日志条目
   const logIndex = (developmentLogs.value[product.instanceId] || []).length
   addDevelopmentLog(product.instanceId, {
@@ -1099,11 +1196,42 @@ const generateWeeklyDevLog = (product) => {
   )
 }
 
+// 启动星期几循环显示
+const startWeekdayTimer = () => {
+  // 清除旧的定时器
+  if (weekdayTimer.value) {
+    clearInterval(weekdayTimer.value)
+  }
+  
+  // 每秒切换星期几（1-7循环）
+  weekdayTimer.value = setInterval(() => {
+    currentWeekday.value = currentWeekday.value >= 7 ? 1 : currentWeekday.value + 1
+  }, 1000)
+}
+
+// 停止星期几定时器
+const stopWeekdayTimer = () => {
+  if (weekdayTimer.value) {
+    clearInterval(weekdayTimer.value)
+    weekdayTimer.value = null
+  }
+}
+
+// 监听 developmentLogs，确保它永远不会变成 null 或非对象
+watch(developmentLogs, (newVal) => {
+  if (!newVal || typeof newVal !== 'object' || Array.isArray(newVal)) {
+    console.warn('developmentLogs 变成了无效值，重置为空对象')
+    developmentLogs.value = {}
+  }
+}, { immediate: true })
+
 // 生命周期
 onLoad(() => {
   initGame()
   // 初始化研发日志
   initDevelopmentLogs()
+  // 启动星期几显示
+  startWeekdayTimer()
 })
 
 onShow(() => {
@@ -1112,7 +1240,28 @@ onShow(() => {
   if (latestState) {
     gameState.value = latestState
     
-    // 初始化开发中产品的研发日志
+    // 恢复研发日志数据（确保是一个对象）
+    try {
+      if (latestState.developmentLogs && typeof latestState.developmentLogs === 'object' && !Array.isArray(latestState.developmentLogs)) {
+        // 深拷贝以避免引用问题，并过滤掉无效值
+        const rawLogs = JSON.parse(JSON.stringify(latestState.developmentLogs))
+        // 确保每个产品的日志都是数组
+        const validLogs = {}
+        for (const key in rawLogs) {
+          if (Array.isArray(rawLogs[key])) {
+            validLogs[key] = rawLogs[key].filter(log => log && typeof log === 'object')
+          }
+        }
+        developmentLogs.value = validLogs
+      } else {
+        developmentLogs.value = {}
+      }
+    } catch (error) {
+      console.error('恢复研发日志失败:', error)
+      developmentLogs.value = {}
+    }
+    
+    // 初始化开发中产品的研发日志（只初始化新产品）
     initDevelopmentLogs()
     
     // 重启时间管理器（始终继续运行）
@@ -1121,18 +1270,25 @@ onShow(() => {
       timeManager.value.start()
     }
   }
+  
+  // 重新启动星期几显示
+  startWeekdayTimer()
 })
 
 onHide(() => {
   // 离开页面时保存游戏状态并暂停
   if (gameState.value) {
-    saveGameState(gameState.value)
+    saveGameWithLogs()
   }
   timeManager.value?.pause()
+  // 停止星期几显示
+  stopWeekdayTimer()
 })
 
 onUnmounted(() => {
   timeManager.value?.destroy()
+  // 清除星期几定时器
+  stopWeekdayTimer()
 })
 </script>
 

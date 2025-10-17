@@ -138,7 +138,7 @@ export function calculateWeeksDiff(year1, week1, year2, week2) {
 export function formatTime(year, week) {
   const weekOfYear = week % TIME_CONFIG.WEEKS_PER_YEAR || TIME_CONFIG.WEEKS_PER_YEAR;
   const month = Math.ceil(weekOfYear / TIME_CONFIG.WEEKS_PER_MONTH);
-  return `${year}年${month}月 第${weekOfYear}周`;
+  return `${year}年${month}月第${weekOfYear}周`;
 }
 
 // 判断当前时代

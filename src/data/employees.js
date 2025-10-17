@@ -213,7 +213,7 @@ export function generateCandidate(channel, customName = null) {
   const salary = calculateSalary(abilities.programming, abilities.art, abilities.business);
   
   return {
-    id: Date.now() + Math.random(), // 临时ID
+    id: Date.now() * 1000 + Math.floor(Math.random() * 1000), // 临时ID（整数，避免小数点）
     name,
     programming: abilities.programming,
     art: abilities.art,

@@ -1126,7 +1126,7 @@ export function createProductInstance(templateId, customName, monetization, assi
   if (!template) return null;
   
   return {
-    instanceId: Date.now() + Math.random(),
+    instanceId: Date.now() * 1000 + Math.floor(Math.random() * 1000),
     templateId: template.id,
     name: customName || template.name,
     slogan: slogan, // AI生成的产品口号
