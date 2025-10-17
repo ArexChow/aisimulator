@@ -46,6 +46,47 @@
     <!-- 步骤2: 选择具体产品 -->
     <view v-if="currentStep === 1" class="step-content">
       <view class="pixel-subtitle text-center">选择产品</view>
+      
+      <!-- AI创意生成按钮 -->
+      <view class="ai-ideas-section mb-20">
+        <view 
+          class="pixel-btn pixel-btn-info"
+          @click="getProductIdeas"
+          :class="{ 'pixel-btn-disabled': generatingIdeas }"
+        >
+          {{ generatingIdeas ? '生成中...' : '💡 获取创意' }}
+        </view>
+        
+        <!-- 显示AI生成的创意 -->
+        <view v-if="productIdeas.length > 0" class="ideas-container mt-20">
+          <view class="pixel-subtitle text-center">AI生成的创意</view>
+          <scroll-view scroll-y class="ideas-list">
+            <view 
+              v-for="(idea, index) in productIdeas"
+              :key="index"
+              class="idea-card pixel-card"
+              @click="useProductIdea(idea)"
+            >
+              <view class="idea-name">{{ idea.name }}</view>
+              <view class="idea-slogan">{{ idea.slogan }}</view>
+              <view class="idea-desc">{{ idea.description }}</view>
+              <view class="idea-highlights">
+                <view 
+                  v-for="(highlight, hIdx) in idea.highlights"
+                  :key="hIdx"
+                  class="highlight-tag"
+                >
+                  #{{ highlight }}
+                </view>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+
+      <view class="pixel-divider my-20"></view>
+      
+      <view class="pixel-subtitle text-center">或选择预设产品</view>
       <scroll-view scroll-y class="products-list">
         <view 
           v-for="product in productsInCategory" 
@@ -183,6 +224,7 @@ import { getAvailableProducts, getAvailableCategories, getProductById, createPro
 import { getUnlockedMonetizationMethods } from '@/data/growthRules'
 import { getAllSolutions, generateDevelopmentTasks } from '@/data/solutions'
 import { assignEmployeeToProduct, getIdleEmployees } from '@/utils/employeeManager'
+import { aiContentFactory } from '@/utils/aiContentFactory'
 
 // 状态数据
 const gameState = ref(null)
@@ -197,6 +239,10 @@ const productName = ref('')
 const selectedMonetization = ref(null)
 const selectedSolution = ref('balanced')
 const selectedEmployees = ref([])
+
+// AI创意生成状态
+const generatingIdeas = ref(false)
+const productIdeas = ref([])
 
 // 可用选项
 const availableCategories = ref([])
@@ -374,6 +420,52 @@ const goBack = () => {
   uni.navigateBack()
 }
 
+const getProductIdeas = async () => {
+  if (generatingIdeas.value) return
+  generatingIdeas.value = true
+  try {
+    const ideas = await aiContentFactory.generateProductIdeas({
+      year: gameState.value.currentYear,
+      era: gameState.value.era,
+      companyName: gameState.value.companyName,
+      existingProducts: gameState.value.products?.map(p => p.name) || [],
+      companyStrength: '技术导向',
+      category: selectedCategory.value,
+      grade: 'C',
+      monetization: selectedMonetization.value || 'ad',
+      trendingTopics: ['产品创新', '用户体验'],
+      competitors: [],
+      userPainPoints: []
+    })
+    productIdeas.value = ideas
+    uni.showToast({
+      title: '已生成3个创意方案',
+      icon: 'success'
+    })
+  } catch (error) {
+    console.error('获取创意失败:', error)
+    uni.showToast({
+      title: '获取创意失败，使用预设方案',
+      icon: 'none'
+    })
+  } finally {
+    generatingIdeas.value = false
+  }
+}
+
+const useProductIdea = (idea) => {
+  productName.value = idea.name
+  selectedProduct.value = null // 清空预设产品选择
+  selectedProductTemplate.value = null
+  selectedMonetization.value = null
+  selectedSolution.value = 'balanced'
+  selectedEmployees.value = []
+  uni.showToast({
+    title: `使用创意: ${idea.name}`,
+    icon: 'none'
+  })
+}
+
 // 生命周期
 onLoad(() => {
   initData()
@@ -491,6 +583,61 @@ onLoad(() => {
 .category-name {
   font-size: 26rpx;
   font-weight: bold;
+  color: #3E2723;
+}
+
+.ai-ideas-section {
+  margin-top: 30rpx;
+}
+
+.ideas-container {
+  margin-top: 20rpx;
+}
+
+.ideas-list {
+  height: 300rpx; /* Adjust height as needed */
+  overflow-y: auto;
+}
+
+.idea-card {
+  padding: 20rpx;
+  margin-bottom: 15rpx;
+  cursor: pointer;
+  background: #FFF;
+  border: 3px solid #3E2723;
+}
+
+.idea-name {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #3E2723;
+  margin-bottom: 8rpx;
+}
+
+.idea-slogan {
+  font-size: 24rpx;
+  color: #5D4037;
+  margin-bottom: 10rpx;
+}
+
+.idea-desc {
+  font-size: 22rpx;
+  color: #5D4037;
+  line-height: 1.6;
+  margin-bottom: 10rpx;
+}
+
+.idea-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.highlight-tag {
+  background: #E0E0E0;
+  padding: 5rpx 12rpx;
+  border-radius: 10rpx;
+  font-size: 20rpx;
   color: #3E2723;
 }
 

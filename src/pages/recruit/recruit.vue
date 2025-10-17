@@ -105,6 +105,22 @@
             <view class="candidate-salary">月薪: ¥{{ candidate.salary }}</view>
             <view class="candidate-stamina">体力: {{ candidate.stamina }}</view>
           </view>
+          
+          <!-- 背景故事 -->
+          <view class="candidate-story-section">
+            <view 
+              class="story-toggle"
+              @click="toggleStory(index)"
+            >
+              📖 {{ expandedStory === index ? '收起' : '背景故事' }}
+            </view>
+            <view v-if="expandedStory === index" class="story-content">
+              <view v-if="candidateStories[index]" class="story-text">
+                {{ candidateStories[index] }}
+              </view>
+              <view v-else class="story-loading">生成中...</view>
+            </view>
+          </view>
         </view>
       </view>
       
@@ -205,6 +221,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { loadGameState, saveGameState, addEmployee, addNews } from '@/utils/storage'
 import { RECRUITMENT_CHANNELS, generateCandidates as genCandidates, generateRandomName } from '@/data/employees'
 import { formatMoney } from '@/utils/financeManager'
+import { aiContentFactory } from '@/utils/aiContentFactory'
 
 // 状态数据
 const gameState = ref(null)
@@ -213,6 +230,9 @@ const selectedChannel = ref(null)
 const candidates = ref([])
 const selectedCandidate = ref(null)
 const customName = ref('')
+// AI背景故事状态
+const expandedStory = ref(null)
+const candidateStories = ref({})
 
 // 招聘渠道
 const channels = ref([])
@@ -294,6 +314,40 @@ const refreshCandidates = () => {
 
 const selectCandidate = (index) => {
   selectedCandidate.value = index
+}
+
+// 切换员工背景故事
+const toggleStory = async (index) => {
+  if (expandedStory.value === index) {
+    // 切换关闭
+    expandedStory.value = null
+    return
+  }
+  
+  expandedStory.value = index
+  
+  // 检查是否已缓存故事
+  if (!candidateStories.value[index]) {
+    try {
+      const candidate = candidates.value[index]
+      const story = await aiContentFactory.generateEmployeeStory({
+        name: candidate.name,
+        personality: candidate.personality.name,
+        programming: candidate.programming,
+        art: candidate.art,
+        business: candidate.business,
+        salary: candidate.salary,
+        channel: selectedChannel.value,
+        year: gameState.value.currentYear,
+        era: '移动互联网时代'
+      })
+      
+      candidateStories.value[index] = story
+    } catch (error) {
+      console.error('生成背景故事失败:', error)
+      candidateStories.value[index] = '背景故事生成失败，请重试'
+    }
+  }
 }
 
 const goToConfirm = () => {
@@ -557,6 +611,35 @@ onLoad(() => {
   font-size: 26rpx;
   font-weight: bold;
   color: #3E2723;
+}
+
+.candidate-story-section {
+  margin-top: 20rpx;
+  padding-top: 15rpx;
+  border-top: 2px solid #D7CCC8;
+}
+
+.story-toggle {
+  font-size: 24rpx;
+  color: #5D4037;
+  cursor: pointer;
+  text-align: center;
+  margin-bottom: 15rpx;
+}
+
+.story-content {
+  font-size: 22rpx;
+  color: #8D6E63;
+  line-height: 1.6;
+}
+
+.story-text {
+  margin-top: 10rpx;
+}
+
+.story-loading {
+  text-align: center;
+  color: #8D6E63;
 }
 
 .confirm-card {

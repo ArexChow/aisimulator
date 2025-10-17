@@ -111,7 +111,45 @@
             <view class="product-actions" v-if="product.status === 'operating'">
               <view class="pixel-btn-tiny" @click="promoteProduct(product)">推广</view>
               <view class="pixel-btn-tiny" @click="upgradeProduct(product)">升级</view>
+              <view class="pixel-btn-tiny" @click="showDevLogs(product)">📋日志</view>
+              <view class="pixel-btn-tiny" @click="showComments(product)">💬评论</view>
               <view class="pixel-btn-tiny pixel-btn-danger" @click="offlineProduct(product)">下架</view>
+            </view>
+            
+            <!-- 开发日志展开区 -->
+            <view v-if="selectedProductLogs === product.instanceId" class="product-details">
+              <view class="details-header">开发日志</view>
+              <view v-if="productDevLogs[product.instanceId]?.length > 0" class="logs-list">
+                <view 
+                  v-for="(log, index) in productDevLogs[product.instanceId]"
+                  :key="index"
+                  class="log-item"
+                >
+                  <view class="log-time">第{{ log.week }}周</view>
+                  <view class="log-content">{{ log.content }}</view>
+                </view>
+              </view>
+              <view v-else class="loading-hint">加载中...</view>
+            </view>
+            
+            <!-- 用户评论展开区 -->
+            <view v-if="selectedProductComments === product.instanceId" class="product-details">
+              <view class="details-header">用户评论</view>
+              <view v-if="productComments[product.instanceId]?.length > 0" class="comments-list">
+                <view 
+                  v-for="(comment, index) in productComments[product.instanceId]"
+                  :key="index"
+                  class="comment-item"
+                  :class="'sentiment-' + comment.sentiment"
+                >
+                  <view class="comment-header">
+                    <text class="comment-author">{{ comment.author }}</text>
+                    <text class="comment-rating">{{ '⭐'.repeat(comment.rating) }}</text>
+                  </view>
+                  <view class="comment-content">{{ comment.content }}</view>
+                </view>
+              </view>
+              <view v-else class="loading-hint">加载中...</view>
             </view>
           </view>
         </scroll-view>
@@ -252,6 +290,7 @@ import { updateProductWeekly, applyUpgrade, applyPromotion, PROMOTION_METHODS } 
 import { getThemeByYear, getThemeChangeMessage } from '@/utils/themeSystem'
 import { generateRandomNews, checkMilestoneEvent, generateProductNews } from '@/data/newsEvents'
 import { getSolution, calculateInitialDAU, calculateInitialRating } from '@/data/solutions'
+import { aiContentFactory } from '@/utils/aiContentFactory'
 
 // 状态数据
 const gameState = ref(null)
@@ -262,7 +301,12 @@ const lastEra = ref(null)
 const currentTab = ref('products')
 const unreadNewsCount = ref(0)
 const lastReadNewsId = ref(0)
-const selectedProductFilter = ref(null) // null表示显示所有产品，否则为产品instanceId
+const selectedProductFilter = ref(null)
+// AI内容状态
+const selectedProductLogs = ref(null)
+const selectedProductComments = ref(null)
+const productDevLogs = ref({})
+const productComments = ref({})
 
 // 计算属性
 const timeDisplay = computed(() => {
@@ -318,7 +362,7 @@ const initGame = () => {
   timeManager.value.start()
 }
 
-const handleWeekPass = (timeData) => {
+const handleWeekPass = async (timeData) => {
   if (!gameState.value) return
   
   // 更新游戏状态的时间
@@ -419,9 +463,34 @@ const handleWeekPass = (timeData) => {
       addNews(gameState.value, { content: milestone })
     }
     
-    // 生成随机市场新闻
-    const randomNews = generateRandomNews(gameState.value.currentYear, currentEra)
-    addNews(gameState.value, { content: randomNews })
+    // 生成随机市场新闻（80%AI生成，20%预设）
+    const useAI = Math.random() < 0.8
+    let newsContent = ''
+    
+    if (useAI) {
+      try {
+        newsContent = await aiContentFactory.generateDynamicNews({
+          year: gameState.value.currentYear,
+          era: currentEra,
+          companyName: gameState.value.companyName,
+          employeeCount: gameState.value.employees.length,
+          productCount: gameState.value.products.length,
+          mainProducts: gameState.value.products.slice(0, 3).map(p => ({
+            name: p.name,
+            category: p.category,
+            dau: p.dau
+          })),
+          marketPosition: gameState.value.products.length > 0 ? '成长' : '新创'
+        })
+      } catch (error) {
+        console.error('AI新闻生成失败，使用预设:', error)
+        newsContent = generateRandomNews(gameState.value.currentYear, currentEra)
+      }
+    } else {
+      newsContent = generateRandomNews(gameState.value.currentYear, currentEra)
+    }
+    
+    addNews(gameState.value, { content: newsContent })
     
     // 检查产品里程碑
     gameState.value.products.forEach(product => {
@@ -617,6 +686,83 @@ const offlineProduct = (product) => {
       }
     }
   })
+}
+
+// AI生成的开发日志
+const showDevLogs = async (product) => {
+  if (selectedProductLogs.value === product.instanceId) {
+    // 切换关闭
+    selectedProductLogs.value = null
+    return
+  }
+  
+  selectedProductLogs.value = product.instanceId
+  selectedProductComments.value = null // 关闭评论
+  
+  // 检查是否已缓存
+  if (!productDevLogs.value[product.instanceId]) {
+    try {
+      const log = await aiContentFactory.generateDevLog({
+        productName: product.name,
+        category: product.category,
+        grade: product.grade,
+        solution: product.solution,
+        employees: gameState.value.employees.filter(e => e.workingOn === product.instanceId),
+        avgProgramming: 70,
+        avgArt: 60,
+        avgBusiness: 50,
+        teamStatus: '正常',
+        currentTask: product.developmentTodos?.[product.currentTodoIndex] || '开发中',
+        progress: product.developmentProgress,
+        week: gameState.value.currentWeek,
+        totalWeeks: 8,
+        isDelayed: false,
+        logType: 'task_progress'
+      })
+      
+      productDevLogs.value[product.instanceId] = productDevLogs.value[product.instanceId] || []
+      productDevLogs.value[product.instanceId].push({
+        week: gameState.value.currentWeek,
+        content: log
+      })
+    } catch (error) {
+      console.error('生成开发日志失败:', error)
+    }
+  }
+}
+
+// AI生成的用户评论
+const showComments = async (product) => {
+  if (selectedProductComments.value === product.instanceId) {
+    // 切换关闭
+    selectedProductComments.value = null
+    return
+  }
+  
+  selectedProductComments.value = product.instanceId
+  selectedProductLogs.value = null // 关闭日志
+  
+  // 检查是否已缓存
+  if (!productComments.value[product.instanceId]) {
+    try {
+      const comments = await aiContentFactory.generateProductComments({
+        productName: product.name,
+        category: product.category,
+        grade: product.grade,
+        weeksSinceLaunch: gameState.value.currentWeek - (product.launchWeek || 0),
+        solution: product.solution,
+        dau: product.dau,
+        rating: product.userRating,
+        trend: 'stable',
+        revenue: product.monthlyRevenue,
+        scenario: 'steady_operation'
+      })
+      
+      productComments.value[product.instanceId] = comments
+    } catch (error) {
+      console.error('生成用户评论失败:', error)
+    }
+  }
 }
 
 const pepTalk = (employee) => {
@@ -1310,6 +1456,101 @@ onUnmounted(() => {
 
 .logo-active .logo-name {
   color: #5D4037;
+}
+
+/* AI内容样式 */
+.product-details {
+  margin-top: 15rpx;
+  padding-top: 15rpx;
+  border-top: 2px solid #E0E0E0;
+}
+
+.details-header {
+  font-weight: bold;
+  font-size: 24rpx;
+  color: #3E2723;
+  margin-bottom: 10rpx;
+}
+
+.logs-list,
+.comments-list {
+  max-height: 300rpx;
+  overflow-y: auto;
+}
+
+.log-item {
+  padding: 10rpx;
+  margin-bottom: 10rpx;
+  background: #F9F9F9;
+  border-left: 4px solid #FF9800;
+}
+
+.log-time {
+  font-size: 20rpx;
+  color: #FF9800;
+  font-weight: bold;
+  margin-bottom: 5rpx;
+}
+
+.log-content {
+  font-size: 22rpx;
+  color: #5D4037;
+  line-height: 1.5;
+}
+
+.comment-item {
+  padding: 12rpx;
+  margin-bottom: 10rpx;
+  background: #F9F9F9;
+  border-radius: 6rpx;
+  border-left: 4px solid #9C27B0;
+}
+
+.comment-item.sentiment-positive {
+  border-left-color: #4CAF50;
+}
+
+.comment-item.sentiment-negative {
+  border-left-color: #F44336;
+}
+
+.comment-item.sentiment-neutral {
+  border-left-color: #9E9E9E;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+  font-size: 20rpx;
+}
+
+.comment-author {
+  font-weight: bold;
+  color: #3E2723;
+}
+
+.comment-rating {
+  color: #FF9800;
+}
+
+.comment-content {
+  font-size: 22rpx;
+  color: #5D4037;
+  line-height: 1.5;
+}
+
+.loading-hint {
+  padding: 20rpx;
+  text-align: center;
+  color: #999;
+  font-size: 24rpx;
+}
+
+.pixel-divider {
+  height: 2px;
+  background: #D7CCC8;
+  margin: 10rpx 0;
 }
 </style>
 

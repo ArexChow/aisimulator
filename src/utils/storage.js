@@ -2,7 +2,8 @@
 
 const STORAGE_KEYS = {
   GAME_STATE: 'game_state',
-  SETTINGS: 'settings'
+  SETTINGS: 'settings',
+  AI_CONTENT_HISTORY: 'ai_content_history'  // AI生成内容历史
 };
 
 // 初始游戏状态 - 增加初始资金使游戏更容易上手
@@ -219,4 +220,41 @@ export function loadSettings() {
     soundEnabled: true,
     autoSave: true
   };
+}
+
+// ========== AI内容历史记录操作 ==========
+
+// 保存AI内容历史
+export function saveAIContentHistory(history) {
+  try {
+    uni.setStorageSync(STORAGE_KEYS.AI_CONTENT_HISTORY, JSON.stringify(history));
+    return true;
+  } catch (e) {
+    console.error('保存AI内容历史失败:', e);
+    return false;
+  }
+}
+
+// 读取AI内容历史
+export function loadAIContentHistory() {
+  try {
+    const data = uni.getStorageSync(STORAGE_KEYS.AI_CONTENT_HISTORY);
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error('读取AI内容历史失败:', e);
+  }
+  return null;
+}
+
+// 清除AI内容历史
+export function clearAIContentHistory() {
+  try {
+    uni.removeStorageSync(STORAGE_KEYS.AI_CONTENT_HISTORY);
+    return true;
+  } catch (e) {
+    console.error('清除AI内容历史失败:', e);
+    return false;
+  }
 }
