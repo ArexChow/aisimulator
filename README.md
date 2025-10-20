@@ -159,6 +159,7 @@
 - **框架**：uni-app (Vue 3)
 - **构建工具**：Vite
 - **数据存储**：uni.storage (localStorage)
+- **AI服务**：字节跳动豆包大模型（用于AI增强内容生成）
 - **平台支持**：H5、微信小程序、APP等全平台
 
 ### 项目结构
@@ -171,12 +172,14 @@ src/
 │   ├── growthRules.js      # 产品增长规则和变现配置
 │   └── newsEvents.js       # 80+新闻事件库
 ├── utils/                  # 工具函数
-│   ├── storage.js          # 游戏状态存储
+│   ├── storage.js          # 游戏状态存储（含token统计）
 │   ├── timeSystem.js       # 时间流逝系统
 │   ├── employeeManager.js  # 员工状态管理
 │   ├── financeManager.js   # 资金管理和结算
 │   ├── balanceSystem.js    # 数值平衡算法
 │   ├── themeSystem.js      # UI主题系统
+│   ├── aiService.js        # AI服务接口（含token统计）
+│   ├── aiContentFactory.js # AI内容生成工厂
 │   └── audioSystem.js      # 音效系统（预留）
 ├── pages/                  # 游戏页面
 │   ├── home/               # 游戏主页
@@ -210,6 +213,36 @@ src/
    
 6. **破产判定算法**：
    - 资金 < 下周支出 且 无收入来源 = 破产
+
+### AI增强系统
+
+游戏集成了豆包大模型AI服务，用于生成动态内容和增强游戏体验：
+
+**AI生成内容**：
+- **产品描述**：根据产品类型和时代背景生成专业描述
+- **用户评论**：生成真实感的用户评价和反馈
+- **开发日志**：记录产品开发过程的关键事件
+- **员工表现**：生成员工工作状态的生动描述
+
+**Token统计（开发参考）**：
+- **实时追踪**：自动统计每次AI调用的input/output token数量
+- **累计记录**：保存在游戏存档中，每局游戏独立统计
+- **首页展示**：开发参考数据卡片显示本局token使用情况
+  - Input Tokens：总输入token数
+  - Output Tokens：总输出token数
+  - Total Tokens：总计token数
+- **自动保存**：随游戏进度自动更新，可用于评估AI调用成本
+
+**技术实现**：
+```javascript
+// aiService.js 提供的核心方法
+- sendMessage()          // 上下文消息（游戏主流程）
+- sendStreamMessage()    // 流式响应（实时对话）
+- sendSimpleMessage()    // 简单消息（独立生成）
+- sendSimpleStreamMessage() // 简单流式（内容生成）
+- getTokenUsage()        // 获取token统计
+- resetTokenUsage()      // 重置统计（新游戏）
+```
 
 ## 运行说明
 
@@ -285,6 +318,8 @@ pnpm build:mp-weixin
 - ✅ 时代UI主题切换（3个时代不同风格）
 - ✅ 音效系统框架（预留音乐地址）
 - ✅ 数值平衡优化（降低难度，提升可玩性）
+- ✅ AI内容生成系统（产品描述、用户评论、开发日志）
+- ✅ Token使用统计（开发参考数据，可追踪AI成本）
 
 ### 🎯 未来扩展方向
 - [ ] 接入真实音乐和音效资源

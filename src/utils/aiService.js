@@ -57,6 +57,8 @@ class AIService {
         this.contextId = ''
         this.previous_response_id = ""
         this.requestStartTime = 0
+        this.sessionInputTokens = 0  // 当前会话输入token总数
+        this.sessionOutputTokens = 0  // 当前会话输出token总数
     }
 
     // 创建上下文
@@ -140,6 +142,15 @@ class AIService {
                 const duration = Date.now() - this.requestStartTime;
                 console.log(`输入：`, message);
                 console.log(`AI响应总耗时: ${duration}ms，返回：`, response.data);
+                
+                // 统计token使用量
+                if (response.data.usage) {
+                    this.sessionInputTokens += response.data.usage.input_tokens || 0;
+                    this.sessionOutputTokens += response.data.usage.output_tokens || 0;
+                    console.log(`Token统计 - Input: ${response.data.usage.input_tokens}, Output: ${response.data.usage.output_tokens}`);
+                    console.log(`累计Token - Input: ${this.sessionInputTokens}, Output: ${this.sessionOutputTokens}`);
+                }
+                
                 return response.data.output[0].content[0].text;
             } else if (response?.data?.error?.param === "previous_response_id") {
                 uni.showToast({
@@ -189,6 +200,15 @@ class AIService {
                 const duration = Date.now() - this.requestStartTime;
                 console.log(`输入：`, message);
                 console.log(`AI响应总耗时: ${duration}ms，返回：`, response.data);
+                
+                // 统计token使用量
+                if (response.data.usage) {
+                    this.sessionInputTokens += response.data.usage.input_tokens || 0;
+                    this.sessionOutputTokens += response.data.usage.output_tokens || 0;
+                    console.log(`Token统计 - Input: ${response.data.usage.input_tokens}, Output: ${response.data.usage.output_tokens}`);
+                    console.log(`累计Token - Input: ${this.sessionInputTokens}, Output: ${this.sessionOutputTokens}`);
+                }
+                
                 return response.data.output[0].content[0].text;
             } else if (response?.data?.error?.param === "previous_response_id") {
                 uni.showToast({
@@ -305,6 +325,15 @@ class AIService {
                             } else if (json.type === 'response.completed') {
                                 this.contextId = json?.response?.id
                                 console.warn(">>>", json.response?.usage,json?.response?.output?.[0]?.content?.[0]?.text)
+                                
+                                // 统计token使用量
+                                if (json.response?.usage) {
+                                    this.sessionInputTokens += json.response.usage.input_tokens || 0;
+                                    this.sessionOutputTokens += json.response.usage.output_tokens || 0;
+                                    console.log(`Token统计 - Input: ${json.response.usage.input_tokens}, Output: ${json.response.usage.output_tokens}`);
+                                    console.log(`累计Token - Input: ${this.sessionInputTokens}, Output: ${this.sessionOutputTokens}`);
+                                }
+                                
                                 onCompleteCallback(json?.response?.output?.[0]?.content?.[0]?.text)
                             }
                         } catch (e) {
@@ -370,6 +399,15 @@ class AIService {
             if (response?.data?.output?.[0]?.content?.[0]?.text) {
                 const duration = Date.now() - this.requestStartTime;
                 console.log(`AI简单消息耗时: ${duration}ms，返回：`, response.data);
+                
+                // 统计token使用量
+                if (response.data.usage) {
+                    this.sessionInputTokens += response.data.usage.input_tokens || 0;
+                    this.sessionOutputTokens += response.data.usage.output_tokens || 0;
+                    console.log(`Token统计(简单消息) - Input: ${response.data.usage.input_tokens}, Output: ${response.data.usage.output_tokens}`);
+                    console.log(`累计Token - Input: ${this.sessionInputTokens}, Output: ${this.sessionOutputTokens}`);
+                }
+                
                 return response.data.output[0].content[0].text;
             } else {
                 throw new Error('AI响应格式错误: ' + JSON.stringify(response?.data));
@@ -455,6 +493,15 @@ class AIService {
                             } else if (json.type === 'response.completed') {
                                 const fullContent = json?.response?.output?.[0]?.content?.[0]?.text;
                                 console.log("Simple stream completed, usage:", json.response?.usage);
+                                
+                                // 统计token使用量
+                                if (json.response?.usage) {
+                                    this.sessionInputTokens += json.response.usage.input_tokens || 0;
+                                    this.sessionOutputTokens += json.response.usage.output_tokens || 0;
+                                    console.log(`Token统计(简单流) - Input: ${json.response.usage.input_tokens}, Output: ${json.response.usage.output_tokens}`);
+                                    console.log(`累计Token - Input: ${this.sessionInputTokens}, Output: ${this.sessionOutputTokens}`);
+                                }
+                                
                                 if (onCompleteCallback) {
                                     onCompleteCallback(fullContent || receivedContent);
                                 }
@@ -495,6 +542,21 @@ class AIService {
     // 获取上下文 ID
     getContextId() {
         return this.contextId;
+    }
+
+    // 获取当前会话token统计
+    getTokenUsage() {
+        return {
+            inputTokens: this.sessionInputTokens,
+            outputTokens: this.sessionOutputTokens,
+            totalTokens: this.sessionInputTokens + this.sessionOutputTokens
+        };
+    }
+
+    // 重置token统计（新游戏时调用）
+    resetTokenUsage() {
+        this.sessionInputTokens = 0;
+        this.sessionOutputTokens = 0;
     }
 }
 

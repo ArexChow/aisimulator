@@ -117,6 +117,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { createInitialEmployee } from '@/data/employees'
 import { createNewGame, addEmployee, saveGameState } from '@/utils/storage'
+import { aiService } from '@/utils/aiService'
 
 // 状态数据
 const currentYear = ref(2000)
@@ -150,6 +151,9 @@ const startCompany = () => {
     })
     return
   }
+  
+  // 重置token统计（新游戏开始）
+  aiService.resetTokenUsage()
   
   // 创建新游戏状态
   const gameState = createNewGame(companyName.value)

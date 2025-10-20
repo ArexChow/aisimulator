@@ -319,6 +319,7 @@ import { getThemeByYear, getThemeChangeMessage } from '@/utils/themeSystem'
 import { checkMilestoneEvent, generateProductNews } from '@/data/newsEvents'
 import { getSolution, calculateInitialDAU, calculateInitialRating } from '@/data/solutions'
 import { aiContentFactory } from '@/utils/aiContentFactory'
+import { aiService } from '@/utils/aiService'
 
 // 状态数据
 const gameState = ref(null)
@@ -403,6 +404,12 @@ const saveGameWithLogs = () => {
     // 深拷贝研发日志，避免引用问题和响应式数据问题
     gameState.value.developmentLogs = JSON.parse(JSON.stringify(logsToSave))
     
+    // 更新token统计
+    const tokenUsage = aiService.getTokenUsage()
+    gameState.value.statistics.totalInputTokens = tokenUsage.inputTokens
+    gameState.value.statistics.totalOutputTokens = tokenUsage.outputTokens
+    console.log('保存Token统计 - Input:', tokenUsage.inputTokens, 'Output:', tokenUsage.outputTokens)
+    
     return saveGameState(gameState.value)
   } catch (error) {
     console.error('保存游戏状态失败:', error)
@@ -432,6 +439,13 @@ const initGame = () => {
   }
   
   gameState.value = savedState
+  
+  // 恢复token统计到aiService
+  if (savedState.statistics) {
+    aiService.sessionInputTokens = savedState.statistics.totalInputTokens || 0
+    aiService.sessionOutputTokens = savedState.statistics.totalOutputTokens || 0
+    console.log('恢复Token统计 - Input:', aiService.sessionInputTokens, 'Output:', aiService.sessionOutputTokens)
+  }
   
   // 恢复研发日志数据（确保是一个对象）
   try {

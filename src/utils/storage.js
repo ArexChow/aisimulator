@@ -23,7 +23,9 @@ const INITIAL_GAME_STATE = {
     employeesHired: 0,
     bestProduct: null,
     peakMoney: 80000, // 相应调整
-    startTime: null
+    startTime: null,
+    totalInputTokens: 0,  // 总输入token数
+    totalOutputTokens: 0  // 总输出token数
   }
 };
 

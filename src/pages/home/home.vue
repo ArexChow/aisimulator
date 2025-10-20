@@ -27,6 +27,25 @@
       </view>
     </view>
 
+    <!-- Token统计（开发参考数据） -->
+    <view class="pixel-card mt-40" v-if="hasSavedGame && tokenStats">
+      <view class="pixel-subtitle text-center">🔧 开发参考数据</view>
+      <view class="token-stats">
+        <view class="stat-row">
+          <text class="stat-label">Input Tokens:</text>
+          <text class="stat-value">{{ tokenStats.inputTokens?.toLocaleString() || 0 }}</text>
+        </view>
+        <view class="stat-row">
+          <text class="stat-label">Output Tokens:</text>
+          <text class="stat-value">{{ tokenStats.outputTokens?.toLocaleString() || 0 }}</text>
+        </view>
+        <view class="stat-row total">
+          <text class="stat-label">Total Tokens:</text>
+          <text class="stat-value">{{ ((tokenStats.inputTokens || 0) + (tokenStats.outputTokens || 0))?.toLocaleString() }}</text>
+        </view>
+      </view>
+    </view>
+
 
     <!-- 按钮组 -->
     <view class="button-group mt-40">
@@ -46,14 +65,28 @@
 <script setup>
 import { ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { hasSavedGame as checkSavedGame } from '@/utils/storage'
+import { hasSavedGame as checkSavedGame, loadGameState } from '@/utils/storage'
 
 // 状态数据
 const hasSavedGame = ref(false)
+const tokenStats = ref(null)
 
 // 方法
 const loadData = () => {
   hasSavedGame.value = checkSavedGame()
+  
+  // 加载token统计数据
+  if (hasSavedGame.value) {
+    const gameState = loadGameState()
+    console.log('首页加载游戏状态:', gameState?.statistics)
+    tokenStats.value = {
+      inputTokens: gameState.statistics.totalInputTokens || 0,
+      outputTokens: gameState.statistics.totalOutputTokens || 0
+    }
+    console.log('首页Token统计数据:', tokenStats.value)
+  } else {
+    tokenStats.value = null
+  }
 }
 
 const startNewGame = () => {
@@ -161,6 +194,42 @@ onShow(() => {
   flex-direction: column;
   align-items: stretch;
   padding-bottom: 40rpx;
+}
+
+.token-stats {
+  margin-top: 20rpx;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15rpx 0;
+  border-bottom: 2rpx dashed rgba(93, 64, 55, 0.2);
+  font-size: 26rpx;
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-row.total {
+  margin-top: 10rpx;
+  padding-top: 20rpx;
+  border-top: 3rpx solid rgba(93, 64, 55, 0.3);
+  font-weight: bold;
+  font-size: 28rpx;
+}
+
+.stat-label {
+  color: #5D4037;
+  opacity: 0.8;
+}
+
+.stat-value {
+  color: #D84315;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
 }
 </style>
 
